@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버웍스 자동 알림 스케줄러</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #333;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 900px;
+            box-sizing: border-box;
+            border: 1px solid #e0e0e0;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fcfcfc;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"],
+        input[type="checkbox"],
+        textarea,
+        select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.95em;
+            box-sizing: border-box;
+        }
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 5px;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+        button.delete-btn {
+            background-color: #dc3545;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+            margin-left: 10px;
+        }
+        button.delete-btn:hover {
+            background-color: #c82333;
+        }
+        button.edit-btn {
+            background-color: #ffc107;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+        }
+        button.edit-btn:hover {
+            background-color: #e0a800;
+        }
+        .status-message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            background-color: #e9ecef;
+            color: #333;
+            border: 1px solid #dee2e6;
+        }
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        .schedule-item, .team-member-item {
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+            border-left: 5px solid #007bff;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .schedule-item.type-laptop_duty { border-left-color: #28a745; }
+        .schedule-item.type-code_review { border-left-color: #6f42c1; }
+        .schedule-item p, .team-member-item p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .schedule-item strong, .team-member-item strong {
+            color: #0056b3;
+        }
+        .schedule-item .actions, .team-member-item .actions {
+            margin-top: 10px;
+            text-align: right;
+        }
+        .schedule-item .actions button, .team-member-item .actions button {
+            padding: 6px 12px;
+            font-size: 0.85em;
+            margin-left: 5px;
+        }
+        .cron-guide {
+            font-size: 0.8em;
+            color: #777;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+        .cron-guide a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .cron-guide a:hover {
+            text-decoration: underline;
+        }
+        .flex-group {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .flex-group label {
+            margin-bottom: 0;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>네이버웍스 자동 알림 스케줄러</h1>
+
+        <div class="section team-member-section">
+            <h2>팀원 관리</h2>
+            <div class="form-group">
+                <label for="teamMemberIdInput">팀원 ID:</label>
+                <input type="text" id="teamMemberIdInput" placeholder="예: tmddud333">
+            </div>
+            <div class="form-group">
+                <label for="teamMemberNameInput">팀원 이름:</label>
+                <input type="text" id="teamMemberNameInput" placeholder="예: 홍길동">
+            </div>
+            <div class="flex-group">
+                <input type="checkbox" id="isAuthorizedCheckbox">
+                <label for="isAuthorizedCheckbox">권한 있는 팀원 (노트북 지참 알림 필수 포함)</label>
+            </div>
+            <button id="addTeamMemberButton">팀원 추가</button>
+            <div id="teamMemberStatusMessage" class="status-message" style="display: none;"></div>
+            
+            <h3>등록된 팀원</h3>
+            <div id="teamMemberList">
+                <p>로딩 중...</p>
+            </div>
+        </div>
+
+        <div class="section schedule-form-section">
+            <h2>새 스케줄 추가 / 편집</h2>
+            <div class="form-group">
+                <label for="scheduleTypeSelect">스케줄 타입:</label>
+                <select id="scheduleTypeSelect">
+                    <option value="message">일반 메시지 알림</option>
+                    <option value="laptop_duty">노트북 지참 알림</option>
+                    <option value="code_review">코드 리뷰 짝꿍 알림</option>
+                </select>
+            </div>
+            <div class="form-group" id="messageGroup">
+                <label for="messageInput">메시지 내용:</label>
+                <textarea id="messageInput" placeholder="여기에 보낼 메시지를 입력하세요..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="cronScheduleInput">스케줄 (Cron 형식):</label>
+                <input type="text" id="cronScheduleInput" placeholder="예: 0 0 9 * * MON (매주 월요일 오전 9시)">
+                <div class="cron-guide">
+                    <a href="https://crontab.guru/" target="_blank">Cron 형식 가이드 보기 (crontab.guru)</a><br>
+                    초(0-59) 분(0-59) 시(0-23) 일(1-31) 월(1-12) 요일(0-7, 일요일=0 or 7)
+                </div>
+            </div>
+            <div class="form-group" id="recipientsGroup">
+                <label for="recipientsInput">수신자 ID (콤마로 구분):</label>
+                <input type="text" id="recipientsInput" placeholder="예: tmddud333, user2, user_test (일반 메시지 타입만 해당)">
+            </div>
+            <button id="saveScheduleButton">스케줄 저장</button>
+            <div id="scheduleStatusMessage" class="status-message" style="display: none;"></div>
+        </div>
+
+        <div class="section schedule-list-section">
+            <h2>등록된 스케줄</h2>
+            <div id="scheduledList">
+                <p>로딩 중...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const teamMemberIdInput = document.getElementById('teamMemberIdInput');
+        const teamMemberNameInput = document.getElementById('teamMemberNameInput');
+        const isAuthorizedCheckbox = document.getElementById('isAuthorizedCheckbox');
+        const addTeamMemberButton = document.getElementById('addTeamMemberButton');
+        const teamMemberStatusMessageDiv = document.getElementById('teamMemberStatusMessage');
+        const teamMemberListDiv = document.getElementById('teamMemberList');
+
+        const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
+        const messageGroup = document.getElementById('messageGroup');
+        const messageInput = document.getElementById('messageInput');
+        const cronScheduleInput = document.getElementById('cronScheduleInput');
+        const recipientsGroup = document.getElementById('recipientsGroup');
+        const recipientsInput = document.getElementById('recipientsInput');
+        const saveScheduleButton = document.getElementById('saveScheduleButton');
+        const scheduleStatusMessageDiv = document.getElementById('scheduleStatusMessage');
+        const scheduledListDiv = document.getElementById('scheduledList');
+
+        let currentConfig = { schedules: [], teamMembers: [], currentLaptopDutyPair: [] };
+        let editingTeamMemberId = null;
+
+        function showStatus(messageDiv, message, type = 'info') {
+            messageDiv.textContent = message;
+            messageDiv.className = `status-message ${type}`;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function renderTeamMemberList() {
+            teamMemberListDiv.innerHTML = '';
+            if (currentConfig.teamMembers.length === 0) {
+                teamMemberListDiv.innerHTML = '<p>등록된 팀원이 없습니다. 추가해주세요.</p>';
+                return;
+            }
+
+            currentConfig.teamMembers.forEach(member => {
+                const memberDiv = document.createElement('div');
+                memberDiv.className = 'team-member-item';
+                memberDiv.innerHTML = `
+                    <p><strong>ID:</strong> ${member.id}</p>
+                    <p><strong>이름:</strong> ${member.name}</p>
+                    <p><strong>권한:</strong> ${member.isAuthorized ? '예' : '아니오'}</p>
+                    <p><strong>노트북 지참 횟수:</strong> ${member.laptopDutyCount || 0}</p>
+                    <p><strong>코드리뷰 횟수:</strong> ${member.codeReviewCount || 0}</p>
+                    <div class="actions">
+                        <button class="edit-btn" data-id="${member.id}">편집</button>
+                        <button class="delete-btn" data-id="${member.id}">삭제</button>
+                    </div>
+                `;
+                teamMemberListDiv.appendChild(memberDiv);
+            });
+
+            document.querySelectorAll('.team-member-item .edit-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const idToEdit = event.target.dataset.id;
+                    const memberToEdit = currentConfig.teamMembers.find(m => m.id === idToEdit);
+                    if (memberToEdit) {
+                        teamMemberIdInput.value = memberToEdit.id;
+                        teamMemberNameInput.value = memberToEdit.name;
+                        isAuthorizedCheckbox.checked = memberToEdit.isAuthorized;
+                        editingTeamMemberId = memberToEdit.id;
+                        addTeamMemberButton.textContent = '팀원 업데이트';
+                        teamMemberIdInput.disabled = true;
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            document.querySelectorAll('.team-member-item .delete-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const idToDelete = event.target.dataset.id;
+                    if (confirm(`정말로 팀원 ID: ${idToDelete}를 삭제하시겠습니까?`)) {
+                        currentConfig.teamMembers = currentConfig.teamMembers.filter(m => m.id !== idToDelete);
+                        await sendTeamMembersToServer(currentConfig.teamMembers);
+                    }
+                });
+            });
+        }
+
+        addTeamMemberButton.addEventListener('click', async () => {
+            const id = teamMemberIdInput.value.trim();
+            const name = teamMemberNameInput.value.trim();
+            const isAuthorized = isAuthorizedCheckbox.checked;
+
+            if (!id || !name) {
+                showStatus(teamMemberStatusMessageDiv, '팀원 ID와 이름을 모두 입력해주세요.', 'error');
+                return;
+            }
+
+            let updatedTeamMembers;
+            if (editingTeamMemberId) {
+                updatedTeamMembers = currentConfig.teamMembers.map(member =>
+                    member.id === editingTeamMemberId ? { ...member, name, isAuthorized } : member
+                );
+                editingTeamMemberId = null;
+                teamMemberIdInput.disabled = false;
+                addTeamMemberButton.textContent = '팀원 추가';
+            } else {
+                if (currentConfig.teamMembers.some(member => member.id === id)) {
+                    showStatus(teamMemberStatusMessageDiv, '이미 존재하는 팀원 ID입니다.', 'error');
+                    return;
+                }
+                const newMember = {
+                    id,
+                    name,
+                    isAuthorized,
+                    laptopDutyCount: 0,
+                    codeReviewCount: 0
+                };
+                updatedTeamMembers = [...currentConfig.teamMembers, newMember];
+            }
+
+            await sendTeamMembersToServer(updatedTeamMembers);
+            teamMemberIdInput.value = '';
+            teamMemberNameInput.value = '';
+            isAuthorizedCheckbox.checked = false;
+        });
+
+        async function sendTeamMembersToServer(teamMembersToSend) {
+            try {
+                const response = await fetch('/update-team-members', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                    body: JSON.stringify(teamMembersToSend)
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(teamMemberStatusMessageDiv, data.message, 'success');
+                    currentConfig.teamMembers = data.teamMembers;
+                    renderTeamMemberList();
+                } else {
+                    const errorData = await response.json();
+                    showStatus(teamMemberStatusMessageDiv, '팀원 정보 저장 실패: ' + (errorData.message || '알 수 없는 오류'), 'error');
+                }
+            } catch (error) {
+                showStatus(teamMemberStatusMessageDiv, '네트워크 오류로 팀원 정보를 저장할 수 없습니다.', 'error');
+                console.error('Team member save error:', error);
+            }
+        }
+
+        scheduleTypeSelect.addEventListener('change', () => {
+            const selectedType = scheduleTypeSelect.value;
+            if (selectedType === 'message') {
+                messageGroup.style.display = 'block';
+                recipientsGroup.style.display = 'block';
+            } else {
+                messageGroup.style.display = 'none';
+                recipientsGroup.style.display = 'none';
+            }
+        });
+
+        function renderScheduledList() {
+            scheduledListDiv.innerHTML = '';
+            if (currentConfig.schedules.length === 0) {
+                scheduledListDiv.innerHTML = '<p>등록된 스케줄이 없습니다. 새로 추가해주세요.</p>';
+                return;
+            }
+
+            currentConfig.schedules.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `schedule-item type-${item.type}`;
+                
+                let messageDisplay = item.message;
+                let recipientsDisplay = item.recipients;
+
+                switch(item.type) {
+                    case 'message':
+                        messageDisplay = item.message;
+                        recipientsDisplay = item.recipients;
+                        break;
+                    case 'laptop_duty':
+                        messageDisplay = '노트북 지참 알림 (자동 생성)';
+                        recipientsDisplay = '전체 팀원';
+                        break;
+                    case 'code_review':
+                        messageDisplay = '코드 리뷰 짝꿍 알림 (자동 생성)';
+                        recipientsDisplay = '전체 팀원';
+                        break;
+                }
+
+                itemDiv.innerHTML = `
+                    <p><strong>타입:</strong> ${item.type === 'message' ? '일반 메시지' : item.type === 'laptop_duty' ? '노트북 지참 알림' : '코드 리뷰 짝꿍 알림'}</p>
+                    <p><strong>메시지:</strong> ${messageDisplay}</p>
+                    <p><strong>스케줄:</strong> <code>${item.cronSchedule}</code></p>
+                    <p><strong>수신자:</strong> ${recipientsDisplay}</p>
+                    <div class="actions">
+                        <button class="edit-btn" data-id="${item.id}">편집</button>
+                        <button class="delete-btn" data-id="${item.id}">삭제</button>
+                    </div>
+                `;
+                scheduledListDiv.appendChild(itemDiv);
+            });
+
+            document.querySelectorAll('.schedule-item .edit-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const idToEdit = event.target.dataset.id;
+                    const itemToEdit = currentConfig.schedules.find(item => item.id === idToEdit);
+                    if (itemToEdit) {
+                        scheduleTypeSelect.value = itemToEdit.type;
+                        scheduleTypeSelect.dispatchEvent(new Event('change')); 
+
+                        messageInput.value = itemToEdit.message;
+                        cronScheduleInput.value = itemToEdit.cronSchedule;
+                        recipientsInput.value = itemToEdit.recipients;
+                        saveScheduleButton.dataset.editId = itemToEdit.id;
+                        saveScheduleButton.textContent = '스케줄 업데이트';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            document.querySelectorAll('.schedule-item .delete-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const idToDelete = event.target.dataset.id;
+                    if (confirm('정말로 이 스케줄을 삭제하시겠습니까?')) {
+                        currentConfig.schedules = currentConfig.schedules.filter(item => item.id !== idToDelete);
+                        await sendSchedulesToServer(currentConfig.schedules);
+                    }
+                });
+            });
+        }
+
+        saveScheduleButton.addEventListener('click', async () => {
+            const type = scheduleTypeSelect.value;
+            const newMessage = messageInput.value.trim();
+            const newCronSchedule = cronScheduleInput.value.trim();
+            const newRecipients = recipientsInput.value.trim();
+            const editId = saveScheduleButton.dataset.editId;
+
+            let itemToSave = {
+                id: editId || Date.now().toString(),
+                type: type,
+                cronSchedule: newCronSchedule
+            };
+
+            if (type === 'message') {
+                if (!newMessage || !newRecipients || !newCronSchedule) {
+                    showStatus(scheduleStatusMessageDiv, '메시지, 스케줄, 수신자 필드를 모두 채워주세요.', 'error');
+                    return;
+                }
+                itemToSave.message = newMessage;
+                itemToSave.recipients = newRecipients;
+            } else {
+                if (!newCronSchedule) {
+                    showStatus(scheduleStatusMessageDiv, '스케줄 필드를 채워주세요.', 'error');
+                    return;
+                }
+                itemToSave.message = ''; 
+                itemToSave.recipients = ''; 
+            }
+
+            if (editId) {
+                currentConfig.schedules = currentConfig.schedules.map(item =>
+                    item.id === editId ? itemToSave : item
+                );
+            } else {
+                currentConfig.schedules.push(itemToSave);
+            }
+            
+            await sendSchedulesToServer(currentConfig.schedules);
+            messageInput.value = '';
+            cronScheduleInput.value = '';
+            recipientsInput.value = '';
+            scheduleTypeSelect.value = 'message';
+            scheduleTypeSelect.dispatchEvent(new Event('change'));
+            delete saveScheduleButton.dataset.editId;
+            saveScheduleButton.textContent = '스케줄 저장';
+        });
+
+        async function sendSchedulesToServer(schedulesToSend) {
+            try {
+                const response = await fetch('/update-schedules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                    body: JSON.stringify(schedulesToSend)
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(scheduleStatusMessageDiv, data.message, 'success');
+                    currentConfig.schedules = data.config;
+                    renderScheduledList();
+                } else {
+                    const errorData = await response.json();
+                    showStatus(scheduleStatusMessageDiv, '스케줄 저장 실패: ' + (errorData.message || '알 수 없는 오류'), 'error');
+                }
+            } catch (error) {
+                showStatus(scheduleStatusMessageDiv, '네트워크 오류로 스케줄을 저장할 수 없습니다.', 'error');
+                console.error('Schedule save error:', error);
+            }
+        }
+
+        async function loadInitialConfig() {
+            try {
+                const response = await fetch('/config');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentConfig = data;
+                    renderTeamMemberList();
+                    renderScheduledList();
+                    scheduleTypeSelect.dispatchEvent(new Event('change'));
+                } else {
+                    showStatus(teamMemberStatusMessageDiv, '설정을 불러오지 못했습니다.', 'error');
+                    showStatus(scheduleStatusMessageDiv, '설정을 불러오지 못했습니다.', 'error');
+                }
+            } catch (error) {
+                showStatus(teamMemberStatusMessageDiv, '네트워크 오류로 설정을 불러올 수 없습니다.', 'error');
+                showStatus(scheduleStatusMessageDiv, '네트워크 오류로 설정을 불러올 수 없습니다.', 'error');
+                console.error('Initial config load error:', error);
+            }
+        }
+
+        window.addEventListener('load', loadInitialConfig);
+    </script>
+</body>
+</html>

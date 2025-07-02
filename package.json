@@ -1,0 +1,27 @@
+{
+  "name": "naverworks-message-cron-server",
+  "version": "1.0.0",
+  "description": "네이버웍스 메시지 자동 알림 스케줄러",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "naverworks",
+    "cron",
+    "message",
+    "server",
+    "scheduler",
+    "notification",
+    "team-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "node-cron": "^4.2.0",
+    "node-fetch": "^2.6.7"
+  }
+}
