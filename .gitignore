@@ -13,6 +13,9 @@ pids
 # Configuration files (contain sensitive data)
 config.json
 
+# Logs directory
+logs/
+
 # IDE files
 .vscode/
 .idea/
@@ -34,6 +37,11 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+
+# GitHub configuration (contains sensitive tokens)
+github-config.json
+github-config.local.json
+.github-token
 
 # Logs
 logs

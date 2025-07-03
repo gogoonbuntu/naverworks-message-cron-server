@@ -20,8 +20,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
+    "@octokit/rest": "^20.0.2",
     "node-cron": "^4.2.0",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "winston": "^3.17.0"
   }
 }

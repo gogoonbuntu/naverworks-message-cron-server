@@ -23,7 +23,7 @@
             border-radius: 12px;
             box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
             box-sizing: border-box;
             border: 1px solid #e0e0e0;
         }
@@ -33,6 +33,42 @@
             text-align: center;
             font-weight: 600;
         }
+        
+        /* 탭 네비게이션 스타일 */
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 30px;
+        }
+        .tab-nav button {
+            background-color: transparent;
+            border: none;
+            padding: 15px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            color: #666;
+            font-weight: 500;
+        }
+        .tab-nav button:hover {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .tab-nav button.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        
+        /* 탭 컨텐츠 스타일 */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
         .section {
             margin-bottom: 30px;
             padding: 20px;
@@ -50,6 +86,8 @@
             color: #555;
         }
         input[type="text"],
+        input[type="password"],
+        input[type="date"],
         input[type="checkbox"],
         textarea,
         select {
@@ -84,6 +122,12 @@
             background-color: #0056b3;
             transform: translateY(-1px);
         }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
         button.delete-btn {
             background-color: #dc3545;
             box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
@@ -99,6 +143,28 @@
         }
         button.edit-btn:hover {
             background-color: #e0a800;
+        }
+        button.execute-btn {
+            background-color: #28a745;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+            margin-left: 10px;
+        }
+        button.execute-btn:hover {
+            background-color: #218838;
+        }
+        button.secondary-btn {
+            background-color: #6c757d;
+            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.2);
+        }
+        button.secondary-btn:hover {
+            background-color: #545b62;
+        }
+        button.cancel-btn {
+            background-color: #dc3545;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+        }
+        button.cancel-btn:hover {
+            background-color: #c82333;
         }
         .status-message {
             margin-top: 20px;
@@ -119,7 +185,12 @@
             color: #721c24;
             border-color: #f5c6cb;
         }
-        .schedule-item, .team-member-item {
+        .status-message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+        .schedule-item, .team-member-item, .duty-item, .review-pair-item {
             display: flex;
             flex-direction: column;
             padding: 15px;
@@ -132,18 +203,18 @@
         }
         .schedule-item.type-laptop_duty { border-left-color: #28a745; }
         .schedule-item.type-code_review { border-left-color: #6f42c1; }
-        .schedule-item p, .team-member-item p {
+        .schedule-item p, .team-member-item p, .duty-item p, .review-pair-item p {
             margin: 5px 0;
             font-size: 0.9em;
         }
-        .schedule-item strong, .team-member-item strong {
+        .schedule-item strong, .team-member-item strong, .duty-item strong, .review-pair-item strong {
             color: #0056b3;
         }
-        .schedule-item .actions, .team-member-item .actions {
+        .schedule-item .actions, .team-member-item .actions, .duty-item .actions, .review-pair-item .actions {
             margin-top: 10px;
             text-align: right;
         }
-        .schedule-item .actions button, .team-member-item .actions button {
+        .schedule-item .actions button, .team-member-item .actions button, .duty-item .actions button {
             padding: 6px 12px;
             font-size: 0.85em;
             margin-left: 5px;
@@ -170,74 +241,714 @@
             margin-bottom: 0;
             margin-right: 10px;
         }
+        .current-status {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .current-status h3 {
+            margin: 0 0 10px 0;
+            color: white;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stat-card h4 {
+            margin: 0 0 5px 0;
+            color: #007bff;
+            font-size: 0.9em;
+        }
+        .stat-card p {
+            margin: 0;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .quick-actions button {
+            margin-top: 0;
+        }
+        
+        /* 주간 당직 편성표 스타일 */
+        .weekly-schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .duty-day {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s ease;
+        }
+        .duty-day:hover {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .duty-day.today {
+            border-color: #007bff;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+        }
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+        }
+        .today-badge {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .duty-members {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .duty-day.today .duty-members {
+            color: #0056b3;
+            font-weight: 500;
+        }
+        
+        /* 오늘의 당직자 스타일 */
+        .today-duty-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .today-duty-card.no-duty {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            color: #333;
+        }
+        .duty-info h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.3em;
+            color: white;
+        }
+        .today-duty-card.no-duty .duty-info h3 {
+            color: #333;
+        }
+        .duty-members-large {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .duty-date {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        .duty-tasks {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .duty-tasks h4 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        .duty-tasks ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .duty-tasks li {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        /* 로딩 상태 스타일 */
+        button.execute-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        button.execute-btn.loading {
+            background-color: #6c757d;
+            cursor: wait;
+            position: relative;
+            padding-right: 50px;
+        }
+        button.execute-btn.loading::after {
+            content: "";
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+        
+        /* 리포트 미리보기 관련 스타일 개선 */
+        .report-preview-section {
+            position: relative;
+        }
+        .report-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .report-preview-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .report-status {
+            font-size: 0.85em;
+            color: #6c757d;
+            font-weight: normal;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+        .report-status.generating {
+            color: #007bff;
+            background: #e3f2fd;
+            font-weight: 500;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .report-status.completed {
+            color: #28a745;
+            background: #e8f5e8;
+            font-weight: 500;
+        }
+        .report-status.error {
+            color: #dc3545;
+            background: #f8d7da;
+            font-weight: 500;
+        }
+        .report-status.cancelled {
+            color: #6c757d;
+            background: #f8f9fa;
+            font-weight: 500;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .report-preview-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .report-preview-actions button {
+            margin: 0;
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+        .report-preview-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 120px;
+            color: #6c757d;
+            font-style: italic;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .report-preview-loading::before {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 3px solid #6c757d;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .report-preview-content {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            min-height: 120px;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+        .report-preview-placeholder {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 40px 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .report-send-actions {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .report-send-actions h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1em;
+        }
+        .report-send-actions .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        /* 리포트 관리 관련 스타일 */
+        .report-management {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .report-management h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 1.1em;
+        }
+        .storage-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .storage-stat {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+            text-align: center;
+        }
+        .storage-stat h4 {
+            margin: 0 0 5px 0;
+            color: #28a745;
+            font-size: 0.9em;
+        }
+        .storage-stat p {
+            margin: 0;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        .report-history {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+        }
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .report-item:last-child {
+            border-bottom: none;
+        }
+        .report-item:hover {
+            background: #f8f9fa;
+        }
+        .report-info {
+            flex-grow: 1;
+        }
+        .report-info .report-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        .report-info .report-meta {
+            font-size: 0.85em;
+            color: #666;
+        }
+        .report-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .report-actions button {
+            padding: 4px 8px;
+            font-size: 0.8em;
+            margin: 0;
+        }
+        .progress-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #0c5460;
+            display: none;
+        }
+        .progress-details.visible {
+            display: block;
+        }
+        .progress-step {
+            margin-bottom: 5px;
+        }
+        .progress-step:last-child {
+            margin-bottom: 0;
+        }
+        .progress-step .step-name {
+            font-weight: 600;
+        }
+        .progress-step .step-detail {
+            color: #666;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>네이버웍스 자동 알림 스케줄러</h1>
-
-        <div class="section team-member-section">
-            <h2>팀원 관리</h2>
-            <div class="form-group">
-                <label for="teamMemberIdInput">팀원 ID:</label>
-                <input type="text" id="teamMemberIdInput" placeholder="예: tmddud333">
-            </div>
-            <div class="form-group">
-                <label for="teamMemberNameInput">팀원 이름:</label>
-                <input type="text" id="teamMemberNameInput" placeholder="예: 홍길동">
-            </div>
-            <div class="flex-group">
-                <input type="checkbox" id="isAuthorizedCheckbox">
-                <label for="isAuthorizedCheckbox">권한 있는 팀원 (노트북 지참 알림 필수 포함)</label>
-            </div>
-            <button id="addTeamMemberButton">팀원 추가</button>
-            <div id="teamMemberStatusMessage" class="status-message" style="display: none;"></div>
-            
-            <h3>등록된 팀원</h3>
-            <div id="teamMemberList">
-                <p>로딩 중...</p>
-            </div>
+        
+        <!-- 탭 네비게이션 -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="status">코드리뷰 짝꿍 & 당직 현황</button>
+            <button class="tab-btn" data-tab="team">팀원 및 당직 관리</button>
+            <button class="tab-btn" data-tab="schedule">크론메시지 관리</button>
+            <button class="tab-btn" data-tab="github">🔥 GitHub 성과 분석</button>
         </div>
 
-        <div class="section schedule-form-section">
-            <h2>새 스케줄 추가 / 편집</h2>
-            <div class="form-group">
-                <label for="scheduleTypeSelect">스케줄 타입:</label>
-                <select id="scheduleTypeSelect">
-                    <option value="message">일반 메시지 알림</option>
-                    <option value="laptop_duty">노트북 지참 알림</option>
-                    <option value="code_review">코드 리뷰 짝꿍 알림</option>
-                </select>
+        <!-- 탭 1: 코드리뷰 짝꿍 & 당직 현황 -->
+        <div id="status-tab" class="tab-content active">
+            <div class="current-status">
+                <h3>🚀 자동 스케줄 시스템 가동 중</h3>
+                <p>주간 당직: 매주 월요일 8시 | 당직 알림: 매일 2시, 4시 | 코드리뷰: 매주 월요일 9시</p>
             </div>
-            <div class="form-group" id="messageGroup">
-                <label for="messageInput">메시지 내용:</label>
-                <textarea id="messageInput" placeholder="여기에 보낼 메시지를 입력하세요..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="cronScheduleInput">스케줄 (Cron 형식):</label>
-                <input type="text" id="cronScheduleInput" placeholder="예: 0 0 9 * * MON (매주 월요일 오전 9시)">
-                <div class="cron-guide">
-                    <a href="https://crontab.guru/" target="_blank">Cron 형식 가이드 보기 (crontab.guru)</a><br>
-                    초(0-59) 분(0-59) 시(0-23) 일(1-31) 월(1-12) 요일(0-7, 일요일=0 or 7)
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>등록된 팀원</h4>
+                    <p id="totalMembers">0명</p>
+                </div>
+                <div class="stat-card">
+                    <h4>권한자</h4>
+                    <p id="authorizedMembers">0명</p>
+                </div>
+                <div class="stat-card">
+                    <h4>활성 스케줄</h4>
+                    <p id="activeSchedules">0개</p>
+                </div>
+                <div class="stat-card">
+                    <h4>이번 주</h4>
+                    <p id="currentWeek">-</p>
                 </div>
             </div>
-            <div class="form-group" id="recipientsGroup">
-                <label for="recipientsInput">수신자 ID (콤마로 구분):</label>
-                <input type="text" id="recipientsInput" placeholder="예: tmddud333, user2, user_test (일반 메시지 타입만 해당)">
+
+            <div class="quick-actions">
+                <button id="executeWeeklyDuty" class="execute-btn">주간 당직 편성 실행</button>
+                <button id="executeCodeReview" class="execute-btn">코드리뷰 짝꿍 편성 실행</button>
+                <button id="refreshStatus" class="secondary-btn">현황 새로고침</button>
             </div>
-            <button id="saveScheduleButton">스케줄 저장</button>
-            <div id="scheduleStatusMessage" class="status-message" style="display: none;"></div>
+
+            <div class="section">
+                <h2>📅 이번주 당직 편성표</h2>
+                <div id="weeklyDutySchedule">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🚨 오늘의 당직자</h2>
+                <div id="todayDutyStatus">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>👥 현재 코드리뷰 짝꿍</h2>
+                <div id="currentCodeReviewPairs">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+
+            <div id="statusMessage" class="status-message" style="display: none;"></div>
         </div>
 
-        <div class="section schedule-list-section">
-            <h2>등록된 스케줄</h2>
-            <div id="scheduledList">
-                <p>로딩 중...</p>
+        <!-- 탭 2: 팀원 및 당직 관리 -->
+        <div id="team-tab" class="tab-content">
+            <div class="section">
+                <h2>팀원 관리</h2>
+                <div class="form-group">
+                    <label for="teamMemberIdInput">팀원 ID:</label>
+                    <input type="text" id="teamMemberIdInput" placeholder="예: tmddud333">
+                </div>
+                <div class="form-group">
+                    <label for="teamMemberNameInput">팀원 이름:</label>
+                    <input type="text" id="teamMemberNameInput" placeholder="예: 홍길동">
+                </div>
+                <div class="flex-group">
+                    <input type="checkbox" id="isAuthorizedCheckbox">
+                    <label for="isAuthorizedCheckbox">권한 있는 팀원 (당직 필수 포함)</label>
+                </div>
+                <button id="addTeamMemberButton">팀원 추가</button>
+                <div id="teamMemberStatusMessage" class="status-message" style="display: none;"></div>
+                
+                <h3>등록된 팀원</h3>
+                <div id="teamMemberList">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 탭 3: 크론메시지 관리 -->
+        <div id="schedule-tab" class="tab-content">
+            <div class="section">
+                <h2>새 스케줄 추가 / 편집</h2>
+                <div class="form-group">
+                    <label for="scheduleTypeSelect">스케줄 타입:</label>
+                    <select id="scheduleTypeSelect">
+                        <option value="message">일반 메시지 알림</option>
+                        <option value="laptop_duty">노트북 지참 알림</option>
+                        <option value="code_review">코드 리뷰 짝꿍 알림</option>
+                    </select>
+                </div>
+                <div class="form-group" id="messageGroup">
+                    <label for="messageInput">메시지 내용:</label>
+                    <textarea id="messageInput" placeholder="여기에 보낼 메시지를 입력하세요..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="cronScheduleInput">스케줄 (Cron 형식):</label>
+                    <input type="text" id="cronScheduleInput" placeholder="예: 0 0 9 * * MON (매주 월요일 오전 9시)">
+                    <div class="cron-guide">
+                        <a href="https://crontab.guru/" target="_blank">Cron 형식 가이드 보기 (crontab.guru)</a><br>
+                        초(0-59) 분(0-59) 시(0-23) 일(1-31) 월(1-12) 요일(0-7, 일요일=0 or 7)
+                    </div>
+                </div>
+                <div class="form-group" id="recipientsGroup">
+                    <label for="recipientsInput">수신자 ID (콤마로 구분):</label>
+                    <input type="text" id="recipientsInput" placeholder="예: tmddud333, user2, user_test (일반 메시지 타입만 해당)">
+                </div>
+                <button id="saveScheduleButton">스케줄 저장</button>
+                <div id="scheduleStatusMessage" class="status-message" style="display: none;"></div>
+            </div>
+
+            <div class="section">
+                <h2>등록된 스케줄</h2>
+                <div id="scheduledList">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 탭 4: GitHub 성과 분석 -->
+        <div id="github-tab" class="tab-content">
+            <div class="section">
+                <h2>🔥 GitHub 서비스 상태</h2>
+                <div id="githubStatusInfo" class="stats-grid">
+                    <div class="stat-card">
+                        <h4>GitHub 서비스</h4>
+                        <p id="githubServiceStatus">확인 중...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>모니터링 레포</h4>
+                        <p id="githubRepoCount">0개</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>분석 대상 멤버</h4>
+                        <p id="githubMemberCount">0명</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>주간 리포트</h4>
+                        <p id="githubWeeklyStatus">비활성</p>
+                    </div>
+                </div>
+                
+                <div class="quick-actions">
+                    <button id="githubRefreshStatus" class="secondary-btn">GitHub 상태 새로고침</button>
+                    <button id="githubPreviewWeekly" class="execute-btn">GitHub 주간 리포트 미리보기</button>
+                    <button id="githubPreviewMonthly" class="execute-btn">GitHub 월간 리포트 미리보기</button>
+                    <button id="githubCheckAlerts" class="execute-btn">GitHub 활동 알림 체크</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>커스텀 리포트 생성</h2>
+                <div class="form-group">
+                    <label for="githubStartDate">시작일:</label>
+                    <input type="date" id="githubStartDate">
+                </div>
+                <div class="form-group">
+                    <label for="githubEndDate">종료일:</label>
+                    <input type="date" id="githubEndDate">
+                </div>
+                <div class="flex-group">
+                    <input type="checkbox" id="githubSendToChannel" checked>
+                    <label for="githubSendToChannel">채널로 리포트 전송</label>
+                </div>
+                <button id="githubGenerateCustomReport" class="execute-btn">커스텀 리포트 생성</button>
+                <div id="githubCustomReportMessage" class="status-message" style="display: none;"></div>
+            </div>
+
+            <div class="section">
+                <h2>개별 멤버 통계</h2>
+                <div class="form-group">
+                    <label for="githubMemberSelect">멤버 선택:</label>
+                    <select id="githubMemberSelect">
+                        <option value="">멤버 선택...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="githubMemberStartDate">분석 기간 시작일:</label>
+                    <input type="date" id="githubMemberStartDate">
+                </div>
+                <div class="form-group">
+                    <label for="githubMemberEndDate">분석 기간 종료일:</label>
+                    <input type="date" id="githubMemberEndDate">
+                </div>
+                <button id="githubGetMemberStats" class="execute-btn">멤버 통계 조회</button>
+                <div id="githubMemberStatsResult" class="status-message" style="display: none;"></div>
+            </div>
+
+            <div class="section">
+                <h2>GitHub 설정 관리</h2>
+                <div class="form-group">
+                    <label for="githubToken">GitHub 토큰:</label>
+                    <input type="password" id="githubToken" placeholder="GitHub Personal Access Token">
+                </div>
+                <div class="form-group">
+                    <label for="githubRepoList">모니터링 레포지토리 (owner/repo 형식, 엔터로 구분):</label>
+                    <textarea id="githubRepoList" placeholder="예:&#10;your-org/project1&#10;your-org/project2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="githubTeamMembers">GitHub 팀원 설정 (username:displayName, 줄바꿈으로 구분):</label>
+                    <textarea id="githubTeamMembers" placeholder="예:&#10;tmddud333:승민&#10;cmjeong:창민"></textarea>
+                </div>
+                <div class="flex-group">
+                    <input type="checkbox" id="githubWeeklyEnabled" checked>
+                    <label for="githubWeeklyEnabled">주간 리포트 자동 발송</label>
+                </div>
+                <div class="flex-group">
+                    <input type="checkbox" id="githubMonthlyEnabled" checked>
+                    <label for="githubMonthlyEnabled">월간 리포트 자동 발송</label>
+                </div>
+                <button id="githubUpdateConfig" class="execute-btn">GitHub 설정 저장</button>
+                <div id="githubConfigMessage" class="status-message" style="display: none;"></div>
+            </div>
+
+            <div class="section report-preview-section">
+                <div class="report-preview-header">
+                    <div class="report-preview-title">
+                        <h2>리포트 미리보기</h2>
+                        <span id="githubReportStatus" class="report-status">대기 중</span>
+                    </div>
+                    <div class="report-preview-actions">
+                        <button id="githubCancelReport" class="cancel-btn" style="display: none;">취소</button>
+                    </div>
+                </div>
+                
+                <div id="githubReportPreview" class="report-preview-content">
+                    <div class="report-preview-placeholder">
+                        📊 리포트 미리보기를 보려면 위의 '미리보기' 버튼을 클릭하세요.
+                    </div>
+                </div>
+                
+                <!-- 진행도 세부사항 -->
+                <div id="githubProgressDetails" class="progress-details">
+                    <div id="progressSteps"></div>
+                </div>
+                
+                <div id="githubSendButtons" class="report-send-actions" style="display: none;">
+                    <h4>📤 리포트 전송</h4>
+                    <p>생성된 리포트를 네이버웍스 채널로 전송하시겠습니까?</p>
+                    <div class="actions">
+                        <button id="githubSendReport" class="execute-btn">리포트 발송</button>
+                        <button id="githubDiscardReport" class="secondary-btn">취소</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section report-management">
+                <h3>📁 리포트 관리</h3>
+                
+                <!-- 저장소 통계 -->
+                <h4>저장소 현황</h4>
+                <div id="githubStorageStats" class="storage-stats">
+                    <div class="storage-stat">
+                        <h4>미리보기</h4>
+                        <p id="previewCount">0개</p>
+                    </div>
+                    <div class="storage-stat">
+                        <h4>아카이브</h4>
+                        <p id="archiveCount">0개</p>
+                    </div>
+                    <div class="storage-stat">
+                        <h4>총 용량</h4>
+                        <p id="totalSize">0.00 MB</p>
+                    </div>
+                </div>
+                
+                <!-- 관리 액션 -->
+                <div class="quick-actions">
+                    <button id="githubRefreshStorage" class="secondary-btn">저장소 새로고침</button>
+                    <button id="githubClearCacheBtn" class="secondary-btn">캐시 정리</button>
+                    <button id="githubToggleHistory" class="secondary-btn">리포트 이력 보기</button>
+                </div>
+                
+                <!-- 리포트 이력 -->
+                <div id="githubReportHistorySection" style="display: none;">
+                    <h4>최근 리포트 이력</h4>
+                    <div id="githubReportHistory" class="report-history">
+                        <p style="text-align: center; padding: 20px; color: #666;">로딩 중...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // DOM 요소들
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // 상태 탭 요소들
+        const totalMembersSpan = document.getElementById('totalMembers');
+        const authorizedMembersSpan = document.getElementById('authorizedMembers');
+        const activeSchedulesSpan = document.getElementById('activeSchedules');
+        const currentWeekSpan = document.getElementById('currentWeek');
+        const weeklyDutyScheduleDiv = document.getElementById('weeklyDutySchedule');
+        const todayDutyStatusDiv = document.getElementById('todayDutyStatus');
+        const currentCodeReviewPairsDiv = document.getElementById('currentCodeReviewPairs');
+        const statusMessageDiv = document.getElementById('statusMessage');
+        const executeWeeklyDutyBtn = document.getElementById('executeWeeklyDuty');
+        const executeCodeReviewBtn = document.getElementById('executeCodeReview');
+        const refreshStatusBtn = document.getElementById('refreshStatus');
+
+        // 팀원 관리 탭 요소들
         const teamMemberIdInput = document.getElementById('teamMemberIdInput');
         const teamMemberNameInput = document.getElementById('teamMemberNameInput');
         const isAuthorizedCheckbox = document.getElementById('isAuthorizedCheckbox');
@@ -245,6 +956,7 @@
         const teamMemberStatusMessageDiv = document.getElementById('teamMemberStatusMessage');
         const teamMemberListDiv = document.getElementById('teamMemberList');
 
+        // 스케줄 관리 탭 요소들
         const scheduleTypeSelect = document.getElementById('scheduleTypeSelect');
         const messageGroup = document.getElementById('messageGroup');
         const messageInput = document.getElementById('messageInput');
@@ -254,9 +966,94 @@
         const saveScheduleButton = document.getElementById('saveScheduleButton');
         const scheduleStatusMessageDiv = document.getElementById('scheduleStatusMessage');
         const scheduledListDiv = document.getElementById('scheduledList');
+        
+        // GitHub 탭 요소들
+        const githubServiceStatusSpan = document.getElementById('githubServiceStatus');
+        const githubRepoCountSpan = document.getElementById('githubRepoCount');
+        const githubMemberCountSpan = document.getElementById('githubMemberCount');
+        const githubWeeklyStatusSpan = document.getElementById('githubWeeklyStatus');
+        const githubRefreshStatusBtn = document.getElementById('githubRefreshStatus');
+        const githubPreviewWeeklyBtn = document.getElementById('githubPreviewWeekly');
+        const githubPreviewMonthlyBtn = document.getElementById('githubPreviewMonthly');
+        const githubSendReportBtn = document.getElementById('githubSendReport');
+        const githubDiscardReportBtn = document.getElementById('githubDiscardReport');
+        const githubCancelReportBtn = document.getElementById('githubCancelReport');
+        const githubSendButtonsDiv = document.getElementById('githubSendButtons');
+        const githubCheckAlertsBtn = document.getElementById('githubCheckAlerts');
+        const githubStartDateInput = document.getElementById('githubStartDate');
+        const githubEndDateInput = document.getElementById('githubEndDate');
+        const githubSendToChannelCheckbox = document.getElementById('githubSendToChannel');
+        const githubGenerateCustomReportBtn = document.getElementById('githubGenerateCustomReport');
+        const githubCustomReportMessageDiv = document.getElementById('githubCustomReportMessage');
+        const githubMemberSelect = document.getElementById('githubMemberSelect');
+        const githubMemberStartDateInput = document.getElementById('githubMemberStartDate');
+        const githubMemberEndDateInput = document.getElementById('githubMemberEndDate');
+        const githubGetMemberStatsBtn = document.getElementById('githubGetMemberStats');
+        const githubMemberStatsResultDiv = document.getElementById('githubMemberStatsResult');
+        const githubTokenInput = document.getElementById('githubToken');
+        const githubRepoListTextarea = document.getElementById('githubRepoList');
+        const githubTeamMembersTextarea = document.getElementById('githubTeamMembers');
+        const githubWeeklyEnabledCheckbox = document.getElementById('githubWeeklyEnabled');
+        const githubMonthlyEnabledCheckbox = document.getElementById('githubMonthlyEnabled');
+        const githubUpdateConfigBtn = document.getElementById('githubUpdateConfig');
+        const githubConfigMessageDiv = document.getElementById('githubConfigMessage');
+        const githubReportPreviewDiv = document.getElementById('githubReportPreview');
+        const githubReportStatusSpan = document.getElementById('githubReportStatus');
+        const githubProgressDetailsDiv = document.getElementById('githubProgressDetails');
+        const progressStepsDiv = document.getElementById('progressSteps');
+        
+        // 리포트 관리 요소들
+        const githubStorageStatsDiv = document.getElementById('githubStorageStats');
+        const previewCountSpan = document.getElementById('previewCount');
+        const archiveCountSpan = document.getElementById('archiveCount');
+        const totalSizeSpan = document.getElementById('totalSize');
+        const githubRefreshStorageBtn = document.getElementById('githubRefreshStorage');
+        const githubClearCacheBtnBtn = document.getElementById('githubClearCacheBtn');
+        const githubToggleHistoryBtn = document.getElementById('githubToggleHistory');
+        const githubReportHistorySection = document.getElementById('githubReportHistorySection');
+        const githubReportHistoryDiv = document.getElementById('githubReportHistory');
 
-        let currentConfig = { schedules: [], teamMembers: [], currentLaptopDutyPair: [] };
+        let currentConfig = { 
+            schedules: [], 
+            teamMembers: [], 
+            currentLaptopDutyPair: [],
+            dailyDutySchedule: {},
+            codeReviewPairs: []
+        };
         let editingTeamMemberId = null;
+        
+        // GitHub 관련 변수들
+        let currentReportData = null;
+        let currentReportType = null;
+        let isGeneratingReport = false;
+        let reportGenerationAborted = false;
+        let progressIntervalId = null;
+        let currentProgressData = null;
+
+        // 탭 네비게이션 이벤트
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                // 탭 버튼 활성화 상태 변경
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // 탭 컨텐츠 표시/숨김
+                tabContents.forEach(content => content.classList.remove('active'));
+                document.getElementById(`${targetTab}-tab`).classList.add('active');
+                
+                // 상태 탭이 활성화되면 현황 업데이트
+                if (targetTab === 'status') {
+                    updateStatusTab();
+                }
+                
+                // GitHub 탭이 활성화되면 GitHub 상태 로드
+                if (targetTab === 'github') {
+                    loadGitHubStatus();
+                }
+            });
+        });
 
         function showStatus(messageDiv, message, type = 'info') {
             messageDiv.textContent = message;
@@ -267,6 +1064,216 @@
             }, 5000);
         }
 
+        function getWeekKey(date = new Date()) {
+            const kstDate = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+            const year = kstDate.getFullYear();
+            const week = getWeekNumber(kstDate);
+            return `${year}-W${week.toString().padStart(2, '0')}`;
+        }
+
+        function getWeekNumber(date) {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+            return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        }
+
+        // 상태 탭 업데이트
+        async function updateStatusTab() {
+            const totalMembers = currentConfig.teamMembers.length;
+            const authorizedCount = currentConfig.teamMembers.filter(m => m.isAuthorized).length;
+            const activeScheduleCount = currentConfig.schedules.length + 4; // 기본 스케줄 4개 포함
+            const weekKey = getWeekKey();
+
+            totalMembersSpan.textContent = `${totalMembers}명`;
+            authorizedMembersSpan.textContent = `${authorizedCount}명`;
+            activeSchedulesSpan.textContent = `${activeScheduleCount}개`;
+            currentWeekSpan.textContent = weekKey;
+
+            // 이번주 당직 편성표 로드
+            await loadWeeklyDutySchedule();
+            
+            // 오늘의 당직자 로드
+            await loadTodayDutyStatus();
+            
+            // 현재 코드리뷰 짝꿍 현황
+            const codeReviewPairs = currentConfig.codeReviewPairs || [];
+            if (codeReviewPairs.length > 0) {
+                let pairsHtml = '';
+                codeReviewPairs.forEach(pair => {
+                    const memberNames = pair.members.map(member => `${member.name}(${member.id})`).join(' & ');
+                    pairsHtml += `
+                        <div class="review-pair-item">
+                            <p><strong>짝꿍 ${pair.pairNumber}:</strong> ${memberNames}</p>
+                            <p><strong>편성 주:</strong> ${pair.weekKey}</p>
+                        </div>
+                    `;
+                });
+                currentCodeReviewPairsDiv.innerHTML = pairsHtml;
+            } else {
+                currentCodeReviewPairsDiv.innerHTML = `
+                    <div class="review-pair-item">
+                        <p>이번 주 코드리뷰 짝꿍이 아직 편성되지 않았습니다.</p>
+                        <p>매주 월요일 오전 9시에 자동으로 편성되거나, 수동으로 편성할 수 있습니다.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 이번주 당직 편성표 로드
+        async function loadWeeklyDutySchedule() {
+            try {
+                const response = await fetch('/weekly-duty-schedule');
+                if (response.ok) {
+                    const weeklySchedule = await response.json();
+                    displayWeeklyDutySchedule(weeklySchedule);
+                } else {
+                    weeklyDutyScheduleDiv.innerHTML = '<p>주간 당직 편성표를 불러올 수 없습니다.</p>';
+                }
+            } catch (error) {
+                console.error('Weekly duty schedule load error:', error);
+                weeklyDutyScheduleDiv.innerHTML = '<p>주간 당직 편성표 로드 중 오류가 발생했습니다.</p>';
+            }
+        }
+
+        // 주간 당직 편성표 표시
+        function displayWeeklyDutySchedule(weeklySchedule) {
+            if (weeklySchedule.length === 0) {
+                weeklyDutyScheduleDiv.innerHTML = '<p>이번주 당직 편성표가 없습니다. 주간 당직 편성을 실행해주세요.</p>';
+                return;
+            }
+
+            let scheduleHtml = '<div class="weekly-schedule-grid">';
+            weeklySchedule.forEach(day => {
+                const isToday = day.date === new Date().toISOString().split('T')[0];
+                const todayClass = isToday ? 'today' : '';
+                
+                const membersText = day.members.length > 0 
+                    ? day.members.map(m => `${m.name}(${m.id})`).join(' & ')
+                    : '미배정';
+                
+                scheduleHtml += `
+                    <div class="duty-day ${todayClass}">
+                        <div class="day-header">
+                            <strong>${day.dayName}</strong> (${day.displayDate})
+                            ${isToday ? '<span class="today-badge">오늘</span>' : ''}
+                        </div>
+                        <div class="duty-members">
+                            ${membersText}
+                        </div>
+                    </div>
+                `;
+            });
+            scheduleHtml += '</div>';
+            
+            weeklyDutyScheduleDiv.innerHTML = scheduleHtml;
+        }
+
+        // 오늘의 당직자 로드
+        async function loadTodayDutyStatus() {
+            try {
+                const response = await fetch('/today-duty');
+                if (response.ok) {
+                    const todayDuty = await response.json();
+                    displayTodayDutyStatus(todayDuty);
+                } else {
+                    todayDutyStatusDiv.innerHTML = '<p>오늘의 당직자 정보를 불러올 수 없습니다.</p>';
+                }
+            } catch (error) {
+                console.error('Today duty load error:', error);
+                todayDutyStatusDiv.innerHTML = '<p>오늘의 당직자 정보 로드 중 오류가 발생했습니다.</p>';
+            }
+        }
+
+        // 오늘의 당직자 표시
+        function displayTodayDutyStatus(todayDuty) {
+            // 당직자가 없거나 hasNoDuty가 true인 경우
+            if (!todayDuty || todayDuty.hasNoDuty || !todayDuty.members || todayDuty.members.length === 0) {
+                const currentDate = todayDuty?.displayDate || new Date().toLocaleDateString('ko-KR');
+                todayDutyStatusDiv.innerHTML = `
+                    <div class="today-duty-card no-duty">
+                        <div class="duty-info">
+                            <h3>📅 오늘(${currentDate})</h3>
+                            <p><strong>당직자가 배정되지 않았습니다.</strong></p>
+                            <p>주간 당직 편성을 실행하여 당직자를 배정해주세요.</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const membersText = todayDuty.members.map(m => `${m.name}(${m.id})`).join(' & ');
+            todayDutyStatusDiv.innerHTML = `
+                <div class="today-duty-card">
+                    <div class="duty-info">
+                        <h3>🚨 오늘의 당직자</h3>
+                        <p class="duty-members-large">${membersText}</p>
+                        <p class="duty-date">날짜: ${todayDuty.displayDate}</p>
+                    </div>
+                    <div class="duty-tasks">
+                        <h4>당직 업무</h4>
+                        <ul>
+                            <li>매일 오후 2시, 4시 당직 체크</li>
+                            <li>사무실 보안 상태 확인</li>
+                            <li>시설 이상 유무 점검</li>
+                            <li>긴급상황 발생시 즉시 보고</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showDutyDetails() {
+            alert('당직 업무:\n- 사무실 개방/폐쇄\n- 보안 점검\n- 긴급 상황 대응\n\n당직자에게는 매일 오후 2시, 4시에 알림이 발송됩니다.');
+        }
+
+        // 수동 실행 버튼 이벤트
+        executeWeeklyDutyBtn.addEventListener('click', async () => {
+            if (confirm('주간 당직을 새로 편성하시겠습니까? 기존 당직이 변경될 수 있습니다.')) {
+                try {
+                    showStatus(statusMessageDiv, '주간 당직 편성 중...', 'info');
+                    const response = await fetch('/execute-weekly-duty', { method: 'POST' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        showStatus(statusMessageDiv, data.message, 'success');
+                        await loadInitialConfig();
+                        await updateStatusTab();
+                    } else {
+                        const errorData = await response.json();
+                        showStatus(statusMessageDiv, '주간 당직 편성 실패: ' + errorData.message, 'error');
+                    }
+                } catch (error) {
+                    showStatus(statusMessageDiv, '네트워크 오류로 주간 당직을 편성할 수 없습니다.', 'error');
+                }
+            }
+        });
+
+        executeCodeReviewBtn.addEventListener('click', async () => {
+            if (confirm('코드리뷰 짝꿍을 새로 편성하시겠습니까?')) {
+                try {
+                    showStatus(statusMessageDiv, '코드리뷰 짝꿍 편성 중...', 'info');
+                    const response = await fetch('/execute-code-review', { method: 'POST' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        showStatus(statusMessageDiv, data.message, 'success');
+                        await loadInitialConfig();
+                        await updateStatusTab();
+                    } else {
+                        const errorData = await response.json();
+                        showStatus(statusMessageDiv, '코드리뷰 짝꿍 편성 실패: ' + errorData.message, 'error');
+                    }
+                } catch (error) {
+                    showStatus(statusMessageDiv, '네트워크 오류로 코드리뷰 짝꿍을 편성할 수 없습니다.', 'error');
+                }
+            }
+        });
+
+        refreshStatusBtn.addEventListener('click', async () => {
+            await loadInitialConfig();
+            await updateStatusTab();
+            showStatus(statusMessageDiv, '현황이 새로고침되었습니다.', 'success');
+        });
+
+        // 팀원 관리 함수들
         function renderTeamMemberList() {
             teamMemberListDiv.innerHTML = '';
             if (currentConfig.teamMembers.length === 0) {
@@ -281,8 +1288,9 @@
                     <p><strong>ID:</strong> ${member.id}</p>
                     <p><strong>이름:</strong> ${member.name}</p>
                     <p><strong>권한:</strong> ${member.isAuthorized ? '예' : '아니오'}</p>
-                    <p><strong>노트북 지참 횟수:</strong> ${member.laptopDutyCount || 0}</p>
-                    <p><strong>코드리뷰 횟수:</strong> ${member.codeReviewCount || 0}</p>
+                    <p><strong>노트북 지참 횟수:</strong> ${member.laptopDutyCount || 0}회</p>
+                    <p><strong>주간 당직 횟수:</strong> ${member.weeklyDutyCount || 0}회</p>
+                    <p><strong>코드리뷰 횟수:</strong> ${member.codeReviewCount || 0}회</p>
                     <div class="actions">
                         <button class="edit-btn" data-id="${member.id}">편집</button>
                         <button class="delete-btn" data-id="${member.id}">삭제</button>
@@ -302,6 +1310,9 @@
                         editingTeamMemberId = memberToEdit.id;
                         addTeamMemberButton.textContent = '팀원 업데이트';
                         teamMemberIdInput.disabled = true;
+                        
+                        // 팀원 관리 탭으로 이동
+                        document.querySelector('[data-tab="team"]').click();
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 });
@@ -346,6 +1357,7 @@
                     name,
                     isAuthorized,
                     laptopDutyCount: 0,
+                    weeklyDutyCount: 0,
                     codeReviewCount: 0
                 };
                 updatedTeamMembers = [...currentConfig.teamMembers, newMember];
@@ -369,6 +1381,7 @@
                     showStatus(teamMemberStatusMessageDiv, data.message, 'success');
                     currentConfig.teamMembers = data.teamMembers;
                     renderTeamMemberList();
+                    updateStatusTab();
                 } else {
                     const errorData = await response.json();
                     showStatus(teamMemberStatusMessageDiv, '팀원 정보 저장 실패: ' + (errorData.message || '알 수 없는 오류'), 'error');
@@ -379,6 +1392,7 @@
             }
         }
 
+        // 스케줄 관리 함수들
         scheduleTypeSelect.addEventListener('change', () => {
             const selectedType = scheduleTypeSelect.value;
             if (selectedType === 'message') {
@@ -393,7 +1407,7 @@
         function renderScheduledList() {
             scheduledListDiv.innerHTML = '';
             if (currentConfig.schedules.length === 0) {
-                scheduledListDiv.innerHTML = '<p>등록된 스케줄이 없습니다. 새로 추가해주세요.</p>';
+                scheduledListDiv.innerHTML = '<p>등록된 사용자 정의 스케줄이 없습니다. 새로 추가해주세요.</p><p><small>* 기본 스케줄(주간당직, 당직알림, 코드리뷰)은 자동으로 활성화됩니다.</small></p>';
                 return;
             }
 
@@ -425,11 +1439,22 @@
                     <p><strong>스케줄:</strong> <code>${item.cronSchedule}</code></p>
                     <p><strong>수신자:</strong> ${recipientsDisplay}</p>
                     <div class="actions">
+                        <button class="execute-btn" data-id="${item.id}">즉시 실행</button>
                         <button class="edit-btn" data-id="${item.id}">편집</button>
                         <button class="delete-btn" data-id="${item.id}">삭제</button>
                     </div>
                 `;
                 scheduledListDiv.appendChild(itemDiv);
+            });
+
+            document.querySelectorAll('.schedule-item .execute-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const scheduleId = event.target.dataset.id;
+                    const schedule = currentConfig.schedules.find(item => item.id === scheduleId);
+                    if (schedule && confirm(`"${schedule.type}" 스케줄을 지금 실행하시겠습니까?`)) {
+                        await executeSchedule(scheduleId);
+                    }
+                });
             });
 
             document.querySelectorAll('.schedule-item .edit-btn').forEach(button => {
@@ -445,6 +1470,9 @@
                         recipientsInput.value = itemToEdit.recipients;
                         saveScheduleButton.dataset.editId = itemToEdit.id;
                         saveScheduleButton.textContent = '스케줄 업데이트';
+                        
+                        // 스케줄 관리 탭으로 이동
+                        document.querySelector('[data-tab="schedule"]').click();
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 });
@@ -520,6 +1548,7 @@
                     showStatus(scheduleStatusMessageDiv, data.message, 'success');
                     currentConfig.schedules = data.config;
                     renderScheduledList();
+                    updateStatusTab();
                 } else {
                     const errorData = await response.json();
                     showStatus(scheduleStatusMessageDiv, '스케줄 저장 실패: ' + (errorData.message || '알 수 없는 오류'), 'error');
@@ -527,6 +1556,29 @@
             } catch (error) {
                 showStatus(scheduleStatusMessageDiv, '네트워크 오류로 스케줄을 저장할 수 없습니다.', 'error');
                 console.error('Schedule save error:', error);
+            }
+        }
+
+        async function executeSchedule(scheduleId) {
+            try {
+                showStatus(scheduleStatusMessageDiv, '스케줄 실행 중...', 'info');
+                
+                const response = await fetch('/execute-schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                    body: JSON.stringify({ scheduleId: scheduleId })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(scheduleStatusMessageDiv, data.message, 'success');
+                } else {
+                    const errorData = await response.json();
+                    showStatus(scheduleStatusMessageDiv, '스케줄 실행 실패: ' + (errorData.message || '알 수 없는 오류'), 'error');
+                }
+            } catch (error) {
+                showStatus(scheduleStatusMessageDiv, '네트워크 오류로 스케줄을 실행할 수 없습니다.', 'error');
+                console.error('Schedule execution error:', error);
             }
         }
 
@@ -538,19 +1590,737 @@
                     currentConfig = data;
                     renderTeamMemberList();
                     renderScheduledList();
+                    await updateStatusTab();
                     scheduleTypeSelect.dispatchEvent(new Event('change'));
                 } else {
+                    showStatus(statusMessageDiv, '설정을 불러오지 못했습니다.', 'error');
                     showStatus(teamMemberStatusMessageDiv, '설정을 불러오지 못했습니다.', 'error');
                     showStatus(scheduleStatusMessageDiv, '설정을 불러오지 못했습니다.', 'error');
                 }
             } catch (error) {
+                showStatus(statusMessageDiv, '네트워크 오류로 설정을 불러올 수 없습니다.', 'error');
                 showStatus(teamMemberStatusMessageDiv, '네트워크 오류로 설정을 불러올 수 없습니다.', 'error');
                 showStatus(scheduleStatusMessageDiv, '네트워크 오류로 설정을 불러올 수 없습니다.', 'error');
                 console.error('Initial config load error:', error);
             }
         }
 
-        window.addEventListener('load', loadInitialConfig);
+        // GitHub 기능 함수들
+        async function loadGitHubStatus() {
+            try {
+                const response = await fetch('/github/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    updateGitHubStatusDisplay(status);
+                    
+                    if (status.isEnabled) {
+                        await loadGitHubConfig();
+                    }
+                } else {
+                    githubServiceStatusSpan.textContent = '오류';
+                    githubRepoCountSpan.textContent = '0개';
+                    githubMemberCountSpan.textContent = '0명';
+                    githubWeeklyStatusSpan.textContent = '비활성';
+                }
+            } catch (error) {
+                console.error('GitHub status load error:', error);
+                githubServiceStatusSpan.textContent = '오류';
+            }
+        }
+
+        function updateGitHubStatusDisplay(status) {
+            githubServiceStatusSpan.textContent = status.isEnabled ? '활성' : '비활성';
+            githubRepoCountSpan.textContent = `${status.config?.repositoryCount || 0}개`;
+            githubMemberCountSpan.textContent = `${status.config?.teamMemberCount || 0}명`;
+            githubWeeklyStatusSpan.textContent = status.config?.weeklyReportsEnabled ? '활성' : '비활성';
+            
+            // 버튼 활성화/비활성화
+            const isEnabled = status.isEnabled;
+            githubPreviewWeeklyBtn.disabled = !isEnabled;
+            githubPreviewMonthlyBtn.disabled = !isEnabled;
+            githubCheckAlertsBtn.disabled = !isEnabled;
+            githubGenerateCustomReportBtn.disabled = !isEnabled;
+            githubGetMemberStatsBtn.disabled = !isEnabled;
+        }
+
+        async function loadGitHubConfig() {
+            try {
+                const response = await fetch('/github/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    
+                    // 설정 폼에 데이터 채우기
+                    githubTokenInput.value = config.githubToken === '[CONFIGURED]' ? '' : config.githubToken;
+                    
+                    if (config.repositories) {
+                        const repoList = config.repositories.map(repo => `${repo.owner}/${repo.name}`).join('\n');
+                        githubRepoListTextarea.value = repoList;
+                    }
+                    
+                    if (config.teamMembers) {
+                        const memberList = config.teamMembers.map(member => `${member.githubUsername}:${member.displayName}`).join('\n');
+                        githubTeamMembersTextarea.value = memberList;
+                        
+                        // 멤버 선택 드롭다운 업데이트
+                        githubMemberSelect.innerHTML = '<option value="">멤버 선택...</option>';
+                        config.teamMembers.forEach(member => {
+                            const option = document.createElement('option');
+                            option.value = member.githubUsername;
+                            option.textContent = `${member.displayName} (${member.githubUsername})`;
+                            githubMemberSelect.appendChild(option);
+                        });
+                    }
+                    
+                    githubWeeklyEnabledCheckbox.checked = config.reporting?.weeklyReports?.enabled || false;
+                    githubMonthlyEnabledCheckbox.checked = config.reporting?.monthlyReports?.enabled || false;
+                    
+                } else {
+                    showStatus(githubConfigMessageDiv, 'GitHub 설정을 불러올 수 없습니다.', 'error');
+                }
+            } catch (error) {
+                console.error('GitHub config load error:', error);
+                showStatus(githubConfigMessageDiv, 'GitHub 설정 로드 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 진행도 세부사항 업데이트
+        function updateProgressDetails(progressData) {
+            if (!progressData) {
+                githubProgressDetailsDiv.classList.remove('visible');
+                return;
+            }
+            
+            currentProgressData = progressData;
+            
+            let stepsHtml = '';
+            
+            // 기본 진행 상태
+            stepsHtml += `
+                <div class="progress-step">
+                    <span class="step-name">진행 상태:</span> ${progressData.message}
+                </div>
+            `;
+            
+            // 전체 진행률
+            if (progressData.percentage !== null) {
+                stepsHtml += `
+                    <div class="progress-step">
+                        <span class="step-name">전체 진행률:</span> ${progressData.percentage}%
+                    </div>
+                `;
+            }
+            
+            // 단계 정보
+            if (progressData.currentStep && progressData.totalSteps) {
+                stepsHtml += `
+                    <div class="progress-step">
+                        <span class="step-name">단계:</span> ${progressData.currentStep} / ${progressData.totalSteps}
+                    </div>
+                `;
+            }
+            
+            // 리포지토리 정보
+            if (progressData.repository) {
+                stepsHtml += `
+                    <div class="progress-step">
+                        <span class="step-name">현재 리포지토리:</span> ${progressData.repository}
+                    </div>
+                `;
+            }
+            
+            // 리포트 ID
+            if (progressData.reportId) {
+                stepsHtml += `
+                    <div class="progress-step">
+                        <span class="step-name">리포트 ID:</span> 
+                        <span class="step-detail">${progressData.reportId}</span>
+                    </div>
+                `;
+            }
+            
+            // 시간 정보
+            if (progressData.timestamp) {
+                const time = new Date(progressData.timestamp).toLocaleTimeString();
+                stepsHtml += `
+                    <div class="progress-step">
+                        <span class="step-name">마지막 업데이트:</span> ${time}
+                    </div>
+                `;
+            }
+            
+            progressStepsDiv.innerHTML = stepsHtml;
+            githubProgressDetailsDiv.classList.add('visible');
+        }
+
+        // 저장소 통계 로드
+        async function loadStorageStats() {
+            try {
+                const response = await fetch('/github/storage-stats');
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        const stats = result.data;
+                        previewCountSpan.textContent = `${stats.preview.count}개`;
+                        archiveCountSpan.textContent = `${stats.archive.count}개`;
+                        totalSizeSpan.textContent = `${stats.total.sizeMB} MB`;
+                    }
+                }
+            } catch (error) {
+                console.error('Storage stats load error:', error);
+            }
+        }
+
+        // 리포트 이력 로드
+        async function loadReportHistory() {
+            try {
+                const response = await fetch('/github/report-history?limit=20');
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        displayReportHistory(result.data);
+                    } else {
+                        githubReportHistoryDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #dc3545;">리포트 이력을 불러올 수 없습니다.</p>';
+                    }
+                } else {
+                    githubReportHistoryDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #dc3545;">리포트 이력 로드 중 오류가 발생했습니다.</p>';
+                }
+            } catch (error) {
+                console.error('Report history load error:', error);
+                githubReportHistoryDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #dc3545;">네트워크 오류가 발생했습니다.</p>';
+            }
+        }
+
+        // 리포트 이력 표시
+        function displayReportHistory(reports) {
+            if (reports.length === 0) {
+                githubReportHistoryDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">리포트 이력이 없습니다.</p>';
+                return;
+            }
+            
+            let historyHtml = '';
+            reports.forEach(report => {
+                const date = new Date(report.generatedAt || report.sentAt).toLocaleString();
+                const typeText = report.type === 'weekly' ? '주간' : report.type === 'monthly' ? '월간' : '일반';
+                const categoryText = report.category === 'preview' ? '미리보기' : '아카이브';
+                const sizeText = report.size ? `${(report.size / 1024).toFixed(1)} KB` : 'N/A';
+                
+                historyHtml += `
+                    <div class="report-item">
+                        <div class="report-info">
+                            <div class="report-title">${typeText} 리포트 (${categoryText})</div>
+                            <div class="report-meta">
+                                ${date} | ${sizeText} | ID: ${report.id.substring(0, 12)}...
+                            </div>
+                        </div>
+                        <div class="report-actions">
+                            <button class="secondary-btn" onclick="deleteReport('${report.id}')">삭제</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            githubReportHistoryDiv.innerHTML = historyHtml;
+        }
+
+        // 리포트 삭제
+        async function deleteReport(reportId) {
+            if (!confirm('이 리포트를 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/github/delete-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reportId })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        showStatus(githubConfigMessageDiv, result.message, 'success');
+                        await loadReportHistory(); // 이력 새로고침
+                        await loadStorageStats(); // 통계 새로고침
+                    } else {
+                        showStatus(githubConfigMessageDiv, result.message, 'error');
+                    }
+                } else {
+                    showStatus(githubConfigMessageDiv, '리포트 삭제 중 오류가 발생했습니다.', 'error');
+                }
+            } catch (error) {
+                showStatus(githubConfigMessageDiv, '네트워크 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // GitHub 이벤트 리스너들
+        githubRefreshStatusBtn.addEventListener('click', async () => {
+            await loadGitHubStatus();
+            showStatus(githubConfigMessageDiv, 'GitHub 상태가 새로고침되었습니다.', 'success');
+        });
+
+        // 리포트 생성 상태 관리 함수 (개선된 버전)
+        function setReportGeneratingState(isGenerating, reportType = null) {
+            isGeneratingReport = isGenerating;
+            reportGenerationAborted = false;
+            
+            if (isGenerating) {
+                // 미리보기 버튼들 비활성화 및 로딩 상태 표시
+                githubPreviewWeeklyBtn.disabled = true;
+                githubPreviewMonthlyBtn.disabled = true;
+                githubPreviewWeeklyBtn.classList.add('loading');
+                githubPreviewMonthlyBtn.classList.add('loading');
+                
+                // 취소 버튼 표시
+                githubCancelReportBtn.style.display = 'inline-block';
+                
+                // 상태 표시 업데이트
+                githubReportStatusSpan.textContent = '통계 수집 중...';
+                githubReportStatusSpan.className = 'report-status generating';
+                
+                // 미리보기 영역에 로딩 표시
+                githubReportPreviewDiv.innerHTML = `
+                    <div class="report-preview-loading">
+                        <div>GitHub 리포지토리에서 통계를 수집하고 있습니다...</div>
+                        <div>잠시만 기다려주세요.</div>
+                    </div>
+                `;
+                
+                // 버튼 텍스트 변경
+                if (reportType === 'weekly') {
+                    githubPreviewWeeklyBtn.textContent = '주간 리포트 수집 중...';
+                } else if (reportType === 'monthly') {
+                    githubPreviewMonthlyBtn.textContent = '월간 리포트 수집 중...';
+                }
+                
+                // 전송 버튼 영역 숨기기
+                githubSendButtonsDiv.style.display = 'none';
+                
+            } else {
+                // 버튼들 활성화 및 로딩 상태 제거
+                githubPreviewWeeklyBtn.disabled = false;
+                githubPreviewMonthlyBtn.disabled = false;
+                githubPreviewWeeklyBtn.classList.remove('loading');
+                githubPreviewMonthlyBtn.classList.remove('loading');
+                
+                // 취소 버튼 숨기기
+                githubCancelReportBtn.style.display = 'none';
+                
+                // 버튼 텍스트 복원
+                githubPreviewWeeklyBtn.textContent = 'GitHub 주간 리포트 미리보기';
+                githubPreviewMonthlyBtn.textContent = 'GitHub 월간 리포트 미리보기';
+            }
+        }
+
+        // 리포트 생성 취소 함수
+        function cancelReportGeneration() {
+            if (!isGeneratingReport) return;
+            
+            reportGenerationAborted = true;
+            setReportGeneratingState(false);
+            
+            // 상태 업데이트
+            githubReportStatusSpan.textContent = '취소됨';
+            githubReportStatusSpan.className = 'report-status cancelled';
+            
+            // 미리보기 영역 업데이트
+            githubReportPreviewDiv.innerHTML = `
+                <div class="report-preview-placeholder">
+                    <div class="cancel-message">
+                        리포트 생성이 취소되었습니다.<br>
+                        다시 생성하려면 미리보기 버튼을 클릭하세요.
+                    </div>
+                </div>
+            `;
+            
+            // 현재 리포트 데이터 초기화
+            currentReportData = null;
+            currentReportType = null;
+            
+            showStatus(githubConfigMessageDiv, '리포트 생성이 취소되었습니다.', 'info');
+        }
+
+        // 리포트 생성 완료 처리 함수
+        function handleReportGenerationComplete(data, reportType) {
+            if (reportGenerationAborted) {
+                return; // 취소된 경우 처리하지 않음
+            }
+            
+            setReportGeneratingState(false);
+            
+            if (data.success) {
+                // 성공 처리
+                githubReportPreviewDiv.textContent = data.preview;
+                githubSendButtonsDiv.style.display = 'block';
+                currentReportData = data.preview;
+                currentReportType = reportType;
+                
+                githubReportStatusSpan.textContent = '생성 완료';
+                githubReportStatusSpan.className = 'report-status completed';
+                
+                const reportTypeText = reportType === 'weekly' ? '주간' : '월간';
+                showStatus(githubConfigMessageDiv, `${reportTypeText} 리포트 미리보기가 생성되었습니다. 발송하시려면 아래 버튼을 클릭하세요.`, 'success');
+            } else {
+                // 실패 처리
+                githubReportPreviewDiv.innerHTML = `
+                    <div class="report-preview-placeholder">
+                        <div style="color: #dc3545;">❌ 리포트 생성에 실패했습니다.</div>
+                        <div style="color: #6c757d; font-size: 0.9em; margin-top: 10px;">${data.message || '알 수 없는 오류가 발생했습니다.'}</div>
+                    </div>
+                `;
+                
+                githubReportStatusSpan.textContent = '생성 실패';
+                githubReportStatusSpan.className = 'report-status error';
+                
+                showStatus(githubConfigMessageDiv, data.message || '리포트 생성에 실패했습니다.', 'error');
+            }
+        }
+
+        // 리포트 미리보기 초기화 함수
+        function resetReportPreview() {
+            currentReportData = null;
+            currentReportType = null;
+            githubSendButtonsDiv.style.display = 'none';
+            githubReportStatusSpan.textContent = '대기 중';
+            githubReportStatusSpan.className = 'report-status';
+            githubReportPreviewDiv.innerHTML = `
+                <div class="report-preview-placeholder">
+                    📊 리포트 미리보기를 보려면 위의 '미리보기' 버튼을 클릭하세요.
+                </div>
+            `;
+        }
+
+        githubPreviewWeeklyBtn.addEventListener('click', async () => {
+            if (isGeneratingReport) return;
+            
+            try {
+                setReportGeneratingState(true, 'weekly');
+                showStatus(githubConfigMessageDiv, 'GitHub 주간 리포트 미리보기 생성 중...', 'info');
+                
+                const response = await fetch('/github/preview-weekly-report', { method: 'POST' });
+                
+                // 취소 확인
+                if (reportGenerationAborted) return;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    handleReportGenerationComplete(data, 'weekly');
+                } else {
+                    const errorData = await response.json();
+                    const errorResponse = {
+                        success: false,
+                        message: errorData.message || 'GitHub 주간 리포트 미리보기 생성에 실패했습니다.'
+                    };
+                    handleReportGenerationComplete(errorResponse, 'weekly');
+                }
+            } catch (error) {
+                if (!reportGenerationAborted) {
+                    const errorResponse = {
+                        success: false,
+                        message: 'GitHub 주간 리포트 미리보기 생성 중 오류가 발생했습니다.'
+                    };
+                    handleReportGenerationComplete(errorResponse, 'weekly');
+                }
+            }
+        });
+
+        githubPreviewMonthlyBtn.addEventListener('click', async () => {
+            if (isGeneratingReport) return;
+            
+            try {
+                setReportGeneratingState(true, 'monthly');
+                showStatus(githubConfigMessageDiv, 'GitHub 월간 리포트 미리보기 생성 중...', 'info');
+                
+                const response = await fetch('/github/preview-monthly-report', { method: 'POST' });
+                
+                // 취소 확인
+                if (reportGenerationAborted) return;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    handleReportGenerationComplete(data, 'monthly');
+                } else {
+                    const errorData = await response.json();
+                    const errorResponse = {
+                        success: false,
+                        message: errorData.message || 'GitHub 월간 리포트 미리보기 생성에 실패했습니다.'
+                    };
+                    handleReportGenerationComplete(errorResponse, 'monthly');
+                }
+            } catch (error) {
+                if (!reportGenerationAborted) {
+                    const errorResponse = {
+                        success: false,
+                        message: 'GitHub 월간 리포트 미리보기 생성 중 오류가 발생했습니다.'
+                    };
+                    handleReportGenerationComplete(errorResponse, 'monthly');
+                }
+            }
+        });
+
+        githubSendReportBtn.addEventListener('click', async () => {
+            if (!currentReportData) {
+                showStatus(githubConfigMessageDiv, '전송할 리포트가 없습니다.', 'error');
+                return;
+            }
+
+            if (confirm(`GitHub ${currentReportType === 'weekly' ? '주간' : '월간'} 리포트를 채널로 전송하시겠습니까?`)) {
+                try {
+                    showStatus(githubConfigMessageDiv, 'GitHub 리포트 전송 중...', 'info');
+                    const response = await fetch('/github/send-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: currentReportData })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        showStatus(githubConfigMessageDiv, data.message, 'success');
+                        // 전송 후 초기화
+                        resetReportPreview();
+                        githubReportPreviewDiv.innerHTML = '<div class="report-preview-placeholder">📤 리포트가 성공적으로 전송되었습니다.</div>';
+                    } else {
+                        const errorData = await response.json();
+                        showStatus(githubConfigMessageDiv, errorData.message, 'error');
+                    }
+                } catch (error) {
+                    showStatus(githubConfigMessageDiv, 'GitHub 리포트 전송 중 오류가 발생했습니다.', 'error');
+                }
+            }
+        });
+
+        githubCheckAlertsBtn.addEventListener('click', async () => {
+            try {
+                showStatus(githubConfigMessageDiv, 'GitHub 활동 알림 체크 중...', 'info');
+                const response = await fetch('/github/check-alerts', { method: 'POST' });
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(githubConfigMessageDiv, data.message, data.success ? 'success' : 'info');
+                } else {
+                    const errorData = await response.json();
+                    showStatus(githubConfigMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(githubConfigMessageDiv, 'GitHub 활동 알림 체크 중 오류가 발생했습니다.', 'error');
+            }
+        });
+
+        githubGenerateCustomReportBtn.addEventListener('click', async () => {
+            const startDate = githubStartDateInput.value;
+            const endDate = githubEndDateInput.value;
+            const sendToChannel = githubSendToChannelCheckbox.checked;
+            
+            if (!startDate || !endDate) {
+                showStatus(githubCustomReportMessageDiv, '시작일과 종료일을 모두 입력해주세요.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus(githubCustomReportMessageDiv, '커스텀 리포트 생성 중...', 'info');
+                const response = await fetch('/github/custom-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ startDate, endDate, sendToChannel })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(githubCustomReportMessageDiv, data.message, 'success');
+                    
+                    // 리포트 미리보기 업데이트
+                    if (data.report) {
+                        githubReportPreviewDiv.textContent = data.report;
+                    }
+                } else {
+                    const errorData = await response.json();
+                    showStatus(githubCustomReportMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(githubCustomReportMessageDiv, '커스텀 리포트 생성 중 오류가 발생했습니다.', 'error');
+            }
+        });
+
+        githubGetMemberStatsBtn.addEventListener('click', async () => {
+            const githubUsername = githubMemberSelect.value;
+            const startDate = githubMemberStartDateInput.value;
+            const endDate = githubMemberEndDateInput.value;
+            
+            if (!githubUsername) {
+                showStatus(githubMemberStatsResultDiv, '멤버를 선택해주세요.', 'error');
+                return;
+            }
+            
+            if (!startDate || !endDate) {
+                showStatus(githubMemberStatsResultDiv, '분석 기간을 입력해주세요.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus(githubMemberStatsResultDiv, '멤버 통계 조회 중...', 'info');
+                const response = await fetch('/github/member-stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ githubUsername, startDate, endDate })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        const stats = data.data;
+                        const statsText = `
+📊 ${stats.displayName} (${stats.username}) 통계\n
+- 커밋: ${stats.commits}회\n- PR 생성: ${stats.prsCreated}개\n- PR 리뷰: ${stats.prsReviewed}개\n- 이슈 생성: ${stats.issuesCreated}개\n- 이슈 해결: ${stats.issuesClosed}개\n- 코드 변경: +${stats.linesAdded} / -${stats.linesDeleted}\n- 리뷰 코멘트: ${stats.reviewComments}개
+                        `.trim();
+                        
+                        githubMemberStatsResultDiv.innerHTML = `<pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.9em; line-height: 1.4; white-space: pre-wrap;">${statsText}</pre>`;
+                        githubMemberStatsResultDiv.style.display = 'block';
+                    } else {
+                        showStatus(githubMemberStatsResultDiv, data.message, 'error');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    showStatus(githubMemberStatsResultDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(githubMemberStatsResultDiv, '멤버 통계 조회 중 오류가 발생했습니다.', 'error');
+            }
+        });
+
+        githubUpdateConfigBtn.addEventListener('click', async () => {
+            const token = githubTokenInput.value.trim();
+            const repoListText = githubRepoListTextarea.value.trim();
+            const teamMembersText = githubTeamMembersTextarea.value.trim();
+            
+            // 업데이트할 설정만 수집
+            const newConfig = {};
+            
+            // 토큰이 입력된 경우만 추가
+            if (token) {
+                newConfig.githubToken = token;
+            }
+            
+            // 리포지토리가 입력된 경우만 추가
+            if (repoListText) {
+                try {
+                    const repositories = repoListText.split('\n').filter(line => line.trim()).map(line => {
+                        const [owner, name] = line.trim().split('/');
+                        if (!owner || !name) {
+                            throw new Error(`잘못된 리포지토리 형식: ${line}`);
+                        }
+                        return { owner, name };
+                    });
+                    newConfig.repositories = repositories;
+                } catch (error) {
+                    showStatus(githubConfigMessageDiv, `리포지토리 형식 오류: ${error.message}`, 'error');
+                    return;
+                }
+            }
+            
+            // 팀원 정보가 입력된 경우만 추가
+            if (teamMembersText) {
+                try {
+                    const teamMembers = teamMembersText.split('\n').filter(line => line.trim()).map(line => {
+                        const [githubUsername, displayName] = line.trim().split(':');
+                        if (!githubUsername || !displayName) {
+                            throw new Error(`잘못된 팀원 형식: ${line}`);
+                        }
+                        return { githubUsername, displayName };
+                    });
+                    newConfig.teamMembers = teamMembers;
+                } catch (error) {
+                    showStatus(githubConfigMessageDiv, `팀원 정보 형식 오류: ${error.message}`, 'error');
+                    return;
+                }
+            }
+            
+            // 리포트 설정은 항상 업데이트
+            newConfig.reporting = {
+                weeklyReports: { enabled: githubWeeklyEnabledCheckbox.checked },
+                monthlyReports: { enabled: githubMonthlyEnabledCheckbox.checked }
+            };
+            
+            // 비어있는 설정 체크
+            if (Object.keys(newConfig).length === 1 && newConfig.reporting) {
+                showStatus(githubConfigMessageDiv, '업데이트할 설정이 없습니다. 최소한 한 가지 설정을 입력해주세요.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus(githubConfigMessageDiv, 'GitHub 설정 업데이트 중...', 'info');
+                const response = await fetch('/github/update-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(githubConfigMessageDiv, data.message, 'success');
+                    
+                    // 상태 새로고침
+                    await loadGitHubStatus();
+                } else {
+                    const errorData = await response.json();
+                    showStatus(githubConfigMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(githubConfigMessageDiv, 'GitHub 설정 업데이트 중 오류가 발생했습니다.', 'error');
+            }
+        });
+
+        // 리포트 관리 버튼 이벤트 리스너
+        githubRefreshStorageBtn.addEventListener('click', async () => {
+            await loadStorageStats();
+            showStatus(githubConfigMessageDiv, '저장소 통계가 새로고침되었습니다.', 'success');
+        });
+
+        githubClearCacheBtnBtn.addEventListener('click', async () => {
+            if (confirm('모든 캐시된 리포트 미리보기를 삭제하시겠습니까? 아카이브는 보존됩니다.')) {
+                try {
+                    const response = await fetch('/github/clear-cache', { method: 'POST' });
+                    if (response.ok) {
+                        const result = await response.json();
+                        showStatus(githubConfigMessageDiv, result.message, result.success ? 'success' : 'error');
+                        await loadStorageStats(); // 통계 새로고침
+                        if (githubReportHistorySection.style.display !== 'none') {
+                            await loadReportHistory(); // 이력 새로고침
+                        }
+                    } else {
+                        showStatus(githubConfigMessageDiv, '캐시 정리 중 오류가 발생했습니다.', 'error');
+                    }
+                } catch (error) {
+                    showStatus(githubConfigMessageDiv, '네트워크 오류가 발생했습니다.', 'error');
+                }
+            }
+        });
+
+        githubToggleHistoryBtn.addEventListener('click', async () => {
+            if (githubReportHistorySection.style.display === 'none') {
+                githubReportHistorySection.style.display = 'block';
+                githubToggleHistoryBtn.textContent = '리포트 이력 숨기기';
+                await loadReportHistory();
+            } else {
+                githubReportHistorySection.style.display = 'none';
+                githubToggleHistoryBtn.textContent = '리포트 이력 보기';
+            }
+        });
+
+        // 리포트 삭제 버튼 이벤트 리스너
+        githubDiscardReportBtn.addEventListener('click', () => {
+            if (confirm('생성된 리포트를 삭제하시겠습니까?')) {
+                resetReportPreview();
+                showStatus(githubConfigMessageDiv, '리포트가 삭제되었습니다.', 'info');
+            }
+        });
+
+        window.addEventListener('load', () => {
+            loadInitialConfig();
+            // 초기 로드시 GitHub 상태도 로드
+            loadGitHubStatus();
+            // 리포트 미리보기 초기화
+            resetReportPreview();
+            // 저장소 통계 로드
+            loadStorageStats();
+        });
     </script>
 </body>
 </html>

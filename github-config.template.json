@@ -1,0 +1,102 @@
+{
+  "enabled": true,
+  "githubToken": "",
+  "repositories": [
+    {
+      "name": "smart-settlement-batch",
+      "owner": "danal-rnd",
+      "url": "https://github.com/danal-rnd/smart-settlement-batch",
+      "description": "Smart Settlement Batch Processing",
+      "enabled": true
+    },
+    {
+      "name": "smart-settlement-extapi",
+      "owner": "danal-rnd",
+      "url": "https://github.com/danal-rnd/smart-settlement-extapi",
+      "description": "Smart Settlement External API",
+      "enabled": true
+    },
+    {
+      "name": "smart-settlement-api",
+      "owner": "danal-rnd",
+      "url": "https://github.com/danal-rnd/smart-settlement-api",
+      "description": "Smart Settlement API",
+      "enabled": true
+    },
+    {
+      "name": "smart-settlement-merchant-interface",
+      "owner": "danal-rnd",
+      "url": "https://github.com/danal-rnd/smart-settlement-merchant-interface",
+      "description": "Smart Settlement Merchant Interface",
+      "enabled": true
+    }
+  ],
+  "teamMapping": {
+    "tmddud333": {
+      "githubUsername": "tmddud333",
+      "name": "정승영",
+      "email": "tmddud333@danal.co.kr"
+    },
+    "youyeol": {
+      "githubUsername": "youyeol",
+      "name": "유열",
+      "email": "youyeol@danal.co.kr"
+    },
+    "cmjeong": {
+      "githubUsername": "cmjeong",
+      "name": "정찬미",
+      "email": "cmjeong@danal.co.kr"
+    },
+    "myyeon": {
+      "githubUsername": "myyeon",
+      "name": "연미연",
+      "email": "myyeon@danal.co.kr"
+    },
+    "yjjang": {
+      "githubUsername": "yjjang",
+      "name": "장영지",
+      "email": "yjjang@danal.co.kr"
+    },
+    "jby3146": {
+      "githubUsername": "jby3146",
+      "name": "조병용",
+      "email": "jby3146@danal.co.kr"
+    },
+    "ahssahss": {
+      "githubUsername": "ahssahss",
+      "name": "황승신",
+      "email": "ahssahss@danal.co.kr"
+    }
+  },
+  "reporting": {
+    "weeklyReports": {
+      "enabled": true,
+      "schedule": "0 10 * * 1",
+      "includeMetrics": ["commits", "pullRequests", "codeReviews", "linesChanged"]
+    },
+    "monthlyReports": {
+      "enabled": true,
+      "schedule": "0 11 1 * *",
+      "includeMetrics": ["commits", "pullRequests", "codeReviews", "linesChanged", "issuesCreated", "issuesClosed"]
+    },
+    "activityAlerts": {
+      "enabled": true,
+      "inactivityDays": 7,
+      "schedule": "0 17 * * 5"
+    }
+  },
+  "metrics": {
+    "commitWeight": 1,
+    "pullRequestWeight": 3,
+    "codeReviewWeight": 2,
+    "issueWeight": 1,
+    "documentationWeight": 1.5
+  },
+  "apiSettings": {
+    "rateLimit": {
+      "requestsPerHour": 5000,
+      "retryAfterSeconds": 60
+    },
+    "timeout": 30000
+  }
+}
