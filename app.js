@@ -2,9 +2,17 @@
 // 네이버웍스 메시지 자동 알림 스케줄러 - 메인 진입점
 
 const logger = require('./logger');
-const { startServer, stopServer } = require('./src/server');
-const configService = require('./src/services/config-service');
-const scheduleService = require('./src/services/schedule-service');
+const { startServer, stopServer } = require('./src/api/server');
+const ConfigService = require('./src/services/config-service');
+const ScheduleService = require('./src/services/schedule-service');
+const GitHubService = require('./src/services/github-service');
+const { MessageSender } = require('./src/messaging');
+
+// 서비스 인스턴스
+const configService = new ConfigService();
+const scheduleService = new ScheduleService();
+let githubService = null;
+let messageService = null;
 
 /**
  * 애플리케이션 시작
@@ -37,11 +45,40 @@ function startApplication() {
 function initializeApplication() {
     try {
         // 설정 로드
-        const initialConfig = configService.loadConfig();
-        logger.info(`Configuration loaded: ${initialConfig.teamMembers.length} team members, ${initialConfig.schedules.length} custom schedules`);
+        const config = configService.loadConfig();
+        logger.info(`Configuration loaded: ${config.teamMembers.length} team members, ${Object.keys(config.schedules).length} schedule options`);
+        
+        // 메시지 서비스 초기화
+        if (config.messaging) {
+            messageService = new MessageSender(config.messaging);
+            logger.info('Message service initialized');
+        }
+        
+        // GitHub 서비스 초기화 (선택사항)
+        if (config.github?.enabled) {
+            githubService = new GitHubService();
+            if (githubService.isEnabled) {
+                logger.info('GitHub service initialized and enabled');
+            } else {
+                logger.warn('GitHub service initialization failed - feature disabled');
+                githubService = null;
+            }
+        }
+        
+        // 서비스 객체 준비
+        const services = {
+            configService,
+            messageService,
+            githubService
+        };
         
         // 스케줄링 시작
-        scheduleService.rescheduleJobs(initialConfig);
+        const scheduleConfig = {
+            ...config.schedules,
+            services
+        };
+        
+        scheduleService.rescheduleJobs(scheduleConfig);
         logger.info('Application initialized successfully');
         
     } catch (error) {

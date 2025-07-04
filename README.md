@@ -1,213 +1,323 @@
-# 🚀 네이버웍스 메시지 자동 알림 스케줄러
+# Naverworks Message Cron Server (GitPulse)
 
-팀 내 업무 알림을 자동화하는 Node.js 서비스입니다.
+팀 자동화 및 GitHub 활동 분석을 위한 종합 서버 시스템
 
-## 📋 주요 기능
+## 🚀 주요 기능
 
-### 📅 당직 관리
-- **주간 당직 편성**: 매주 월요일 8시 AM 자동 편성
-- **당직 알림**: 매일 오후 2시, 4시 당직자 알림
-- **공평한 배정**: 당직 횟수 기반 자동 배정
+### 📋 팀 업무 자동화
+- **자동 업무 배정**: 주간 단위 업무 담당자 순환 배정
+- **업무 리마인더**: 일정 시간마다 현재 담당자에게 알림
+- **코드 리뷰 페어링**: 자동 리뷰어 매칭 시스템
+- **노트북 관리**: 기기 관리 담당자 알림
 
-### 👥 팀원 관리
-- **코드리뷰 짝꿍**: 매주 월요일 9시 AM 자동 페어링
-- **노트북 지참**: 매일 오전 9시 당번 알림
-- **팀원 통계**: 각종 활동 횟수 추적
+### 📊 GitHub 활동 분석 (GitPulse)
+- **주간/월간 리포트**: 팀원별 커밋, PR, 리뷰 활동 분석
+- **기여도 시각화**: 통계 기반 팀 기여도 순위 및 하이라이트
+- **활동 알림**: 저조한 활동에 대한 자동 알림
+- **커스텀 기간 분석**: 원하는 기간의 활동 분석
 
-### 🔧 GitHub 성과 분석
-- **주간 리포트**: 매주 월요일 10시 AM 자동 발송
-- **월간 리포트**: 매월 1일 11시 AM 자동 발송
-- **커스텀 리포트**: 원하는 기간 설정 가능
-- **팀원 통계**: 개별 멤버 활동 분석
+### 💬 다중 메시징 채널
+- **네이버웍스**: 기본 메시징 채널
+- **슬랙**: 선택적 연동
+- **이메일**: SMTP/API 기반 전송
 
-## 🛠 설치 및 실행
-
-### 1. 의존성 설치
-```bash
-npm install
-```
-
-### 2. GitHub 설정 (선택사항)
-```bash
-# GitHub 설정 파일 생성
-cp github-config.template.json github-config.json
-
-# GitHub 토큰 설정 (둘 중 하나 선택)
-# 방법 1: 환경 변수 사용
-export GITHUB_TOKEN=your_github_token_here
-
-# 방법 2: 설정 파일에 직접 입력
-# github-config.json 파일의 "githubToken" 값 설정
-```
-
-### 3. 서비스 실행
-```bash
-# 일반 실행
-node app.js
-
-# 개발 모드 (자동 재시작)
-nodemon app.js
-```
-
-### 4. 웹 인터페이스
-```
-http://localhost:3000
-```
-
-## 📂 프로젝트 구조
+## 📁 프로젝트 구조
 
 ```
 naverworks-message-cron-server/
-├── app.js                          # 메인 진입점
 ├── src/
-│   ├── server.js                   # HTTP 서버
-│   ├── routes/
-│   │   └── web-routes.js          # 웹 라우팅
-│   ├── services/
-│   │   ├── config-service.js      # 설정 관리
-│   │   ├── message-service.js     # 메시지 전송
-│   │   ├── duty-service.js        # 당직 관리
-│   │   ├── team-service.js        # 팀원 관리
-│   │   ├── schedule-service.js    # 스케줄링
-│   │   └── github-service.js      # GitHub 통합
-│   └── utils/
-│       └── date-utils.js          # 날짜 유틸리티
-├── config.json                    # 메인 설정
-├── github-config.json             # GitHub 설정
-├── github-config.template.json    # GitHub 설정 템플릿
-└── logs/                          # 로그 파일들
+│   ├── api/                    # REST API 서버
+│   │   ├── server.js           # Express 서버 설정
+│   │   └── routes/             # API 라우터들
+│   │       ├── api.js          # 기본 시스템 API
+│   │       ├── github.js       # GitHub 관련 API
+│   │       ├── config.js       # 설정 관리 API
+│   │       └── schedule.js     # 스케줄 관리 API
+│   │
+│   ├── github/                 # GitHub 모듈 (GitPulse)
+│   │   ├── analyzer.js         # GitHub 활동 분석기
+│   │   ├── collector.js        # GitHub 데이터 수집기
+│   │   ├── message-renderer.js # 메시지 렌더링
+│   │   ├── report-manager.js   # 리포트 관리
+│   │   └── index.js           # 모듈 진입점
+│   │
+│   ├── messaging/              # 메시징 모듈
+│   │   ├── message-sender.js   # 통합 메시지 전송기
+│   │   ├── naverworks-messenger.js # 네이버웍스 연동
+│   │   ├── slack-messenger.js  # 슬랙 연동
+│   │   ├── email-messenger.js  # 이메일 연동
+│   │   └── index.js           # 모듈 진입점
+│   │
+│   ├── services/               # 서비스 레이어
+│   │   ├── config-service.js   # 설정 관리 서비스
+│   │   ├── schedule-service.js # 스케줄 관리 서비스
+│   │   ├── github-service.js   # GitHub 서비스
+│   │   └── index.js           # 서비스 진입점
+│   │
+│   └── utils/                  # 유틸리티 함수들
+│       ├── date-utils.js       # 날짜 관련 유틸리티
+│       ├── string-utils.js     # 문자열 관련 유틸리티
+│       └── index.js           # 유틸리티 진입점
+│
+├── cache/                      # 캐시 및 임시 파일
+├── logs/                       # 로그 파일들
+├── app.js                      # 메인 애플리케이션
+├── logger.js                   # 로깅 설정
+├── config.json                 # 메인 설정 파일
+├── github-config.json          # GitHub 설정 파일
+└── package.json               # 프로젝트 의존성
 ```
 
-## 🔐 GitHub 토큰 설정
+## 🛠 설치 및 설정
 
-### 1. GitHub Personal Access Token 생성
-1. GitHub → Settings → Developer settings → Personal access tokens
-2. "Generate new token" 클릭
-3. 권한 선택:
-   - `repo` (전체 리포지토리 접근)
-   - `read:org` (조직 정보 읽기)
-   - `read:user` (사용자 정보 읽기)
+### 1. 프로젝트 클론 및 의존성 설치
 
-### 2. 토큰 설정 방법
-
-#### 방법 1: 환경 변수 사용 (권장)
 ```bash
-# .env 파일 생성
-echo "GITHUB_TOKEN=your_token_here" > .env
+git clone <repository-url>
+cd naverworks-message-cron-server
+npm install
 ```
 
-#### 방법 2: 설정 파일 사용
-```bash
-# github-config.json 파일에서 githubToken 값 설정
-{
-  "githubToken": "your_token_here",
-  ...
-}
-```
+### 2. 기본 설정
 
-### 3. 모니터링 리포지토리 설정
-`github-config.json` 파일의 `repositories` 섹션에서 모니터링할 리포지토리 설정:
+첫 실행 시 `config.json` 파일이 자동으로 생성됩니다.
 
 ```json
 {
-  "repositories": [
+  "teamMembers": [
     {
-      "name": "your-repo-name",
-      "owner": "your-org",
-      "url": "https://github.com/your-org/your-repo",
-      "description": "Repository description",
-      "enabled": true
+      "name": "홍길동",
+      "email": "hong@example.com", 
+      "githubUsername": "honggildong",
+      "naverworksId": "hong.gildong",
+      "role": "developer",
+      "isActive": true
     }
-  ]
-}
-```
-
-### 4. 팀원 매핑 설정
-`github-config.json` 파일의 `teamMapping` 섹션에서 팀원과 GitHub 계정 매핑:
-
-```json
-{
-  "teamMapping": {
-    "internal_id": {
-      "githubUsername": "github_username",
-      "name": "실제 이름",
-      "email": "email@company.com"
+  ],
+  "schedules": {
+    "enableWeeklyDutyAssignment": true,
+    "weeklyDutySchedule": "0 8 * * 1"
+  },
+  "messaging": {
+    "naverworks": {
+      "enabled": true,
+      "clientId": "YOUR_CLIENT_ID",
+      "clientSecret": "YOUR_CLIENT_SECRET",
+      "defaultChannelId": "YOUR_CHANNEL_ID"
     }
   }
 }
 ```
 
-## 📊 기본 스케줄
+### 3. GitHub 설정 (선택사항)
 
-| 작업 | 시간 | 전송 방식 |
-|------|------|----------|
-| 주간 당직 편성 | 매주 월요일 8시 AM | 채널 |
-| 당직 알림 | 매일 2시, 4시 PM | 채널 |
-| 코드리뷰 짝꿍 | 매주 월요일 9시 AM | 채널 |
-| 노트북 지참 | 매일 9시 AM | 개별 DM |
-| GitHub 주간 리포트 | 매주 월요일 10시 AM | 채널 |
-| GitHub 월간 리포트 | 매월 1일 11시 AM | 채널 |
+GitHub 기능을 사용하려면 `github-config.json` 파일을 생성하세요:
 
-## 🌐 API 엔드포인트
-
-### 기본 관리
-- `GET /` - 웹 인터페이스
-- `GET /config` - 설정 조회
-- `POST /update-schedules` - 스케줄 업데이트
-- `POST /update-team-members` - 팀원 업데이트
-
-### 당직 관리
-- `GET /weekly-duty-schedule` - 주간 당직표 조회
-- `GET /today-duty` - 오늘 당직자 조회
-- `POST /execute-weekly-duty` - 주간 당직 수동 편성
-
-### GitHub 기능
-- `GET /github/status` - GitHub 서비스 상태
-- `POST /github/execute-weekly-report` - 주간 리포트 수동 실행
-- `POST /github/execute-monthly-report` - 월간 리포트 수동 실행
-- `POST /github/custom-report` - 커스텀 기간 리포트
-
-## 🚨 주의사항
-
-### 보안
-- ⚠️ **GitHub 토큰을 절대 공개하지 마세요**
-- ⚠️ `github-config.json` 파일을 Git에 커밋하지 마세요
-- ⚠️ 환경 변수 사용을 권장합니다
-
-### 파일 관리
-- `github-config.json` - Git 제외 (민감 정보)
-- `github-config.template.json` - Git 포함 (템플릿)
-- `config.json` - Git 제외 (팀 설정)
-
-## 📝 로그 확인
-
-```bash
-# 실시간 로그
-tail -f logs/app.log
-
-# 에러 로그
-tail -f logs/error.log
-
-# 디버그 로그
-tail -f logs/debug.log
+```json
+{
+  "githubToken": "YOUR_GITHUB_TOKEN",
+  "repositories": [
+    {
+      "owner": "your-org",
+      "name": "your-repo"
+    }
+  ],
+  "teamMembers": [
+    {
+      "githubUsername": "honggildong",
+      "displayName": "홍길동"
+    }
+  ],
+  "reporting": {
+    "weeklyReports": {
+      "enabled": true,
+      "schedule": "0 9 * * 1"
+    }
+  }
+}
 ```
 
-## 🎯 개발 가이드
+## 🚀 실행
 
-### 새 기능 추가
-1. 적절한 서비스 파일에 함수 추가
-2. 필요시 라우팅 엔드포인트 추가
-3. 스케줄링 필요시 `schedule-service.js` 수정
+### 개발 모드
+```bash
+npm run dev
+```
 
-### 버그 수정
-1. 해당 기능의 서비스 파일 수정
-2. 로그 확인 및 디버깅
-3. 의존성 영향도 확인
+### 프로덕션 모드
+```bash
+npm start
+```
+
+서버가 시작되면:
+- API 서버: `http://localhost:3000`
+- 웹 인터페이스: `http://localhost:3000/web`
+- 헬스 체크: `http://localhost:3000/health`
+
+## 📚 API 문서
+
+### 기본 시스템 API
+
+#### GET `/api/status`
+시스템 상태 조회
+
+#### GET `/api/health`
+헬스 체크
+
+### GitHub API
+
+#### POST `/api/github/reports/weekly`
+주간 GitHub 활동 리포트 생성
+
+#### POST `/api/github/reports/monthly`  
+월간 GitHub 활동 리포트 생성
+
+#### GET `/api/github/status`
+GitHub 서비스 상태 조회
+
+### 설정 API
+
+#### GET `/api/config`
+현재 설정 조회
+
+#### PUT `/api/config`
+설정 업데이트
+
+#### POST `/api/config/validate`
+설정 유효성 검사
+
+### 스케줄 API
+
+#### GET `/api/schedule`
+모든 스케줄 작업 조회
+
+#### POST `/api/schedule/:name/run`
+특정 작업 즉시 실행
+
+#### POST `/api/schedule/reset`
+스케줄 재설정
+
+## 🕐 기본 스케줄
+
+| 작업 | 기본 시간 | 설명 |
+|------|-----------|------|
+| 주간 업무 배정 | 매주 월요일 8시 | 이번 주 담당자 배정 |
+| 업무 리마인더 | 매일 14시, 16시 | 현재 담당자에게 알림 |
+| 코드 리뷰 페어링 | 매주 월요일 9시 | 리뷰어 자동 매칭 |
+| 노트북 관리 | 매일 9시 | 관리 담당자 알림 |
+| GitHub 주간 리포트 | 매주 월요일 9시 | 지난 주 활동 분석 |
+| GitHub 월간 리포트 | 매월 1일 9시 | 지난 달 활동 분석 |
+
+모든 시간은 한국 시간(KST) 기준입니다.
+
+## 🔧 설정 옵션
+
+### 팀 멤버 설정
+```json
+{
+  "name": "이름",
+  "email": "이메일주소",
+  "githubUsername": "GitHub 사용자명",
+  "naverworksId": "네이버웍스 ID",
+  "role": "역할",
+  "isActive": true
+}
+```
+
+### 메시징 채널 설정
+
+#### 네이버웍스
+```json
+{
+  "enabled": true,
+  "clientId": "클라이언트 ID",
+  "clientSecret": "클라이언트 시크릿",
+  "defaultChannelId": "기본 채널 ID"
+}
+```
+
+#### 슬랙
+```json
+{
+  "enabled": false,
+  "botToken": "봇 토큰",
+  "defaultChannelId": "기본 채널"
+}
+```
+
+#### 이메일
+```json
+{
+  "enabled": false,
+  "provider": "smtp",
+  "host": "smtp.gmail.com",
+  "port": 587,
+  "auth": {
+    "user": "사용자",
+    "pass": "비밀번호"
+  }
+}
+```
+
+### GitHub 설정 옵션
+
+#### 리포팅 설정
+```json
+{
+  "weeklyReports": {
+    "enabled": true,
+    "schedule": "0 9 * * 1"
+  },
+  "monthlyReports": {
+    "enabled": true,
+    "schedule": "0 9 1 * *"
+  },
+  "alertThresholds": {
+    "enableLowActivityAlerts": true,
+    "minCommitsPerWeek": 5,
+    "minReviewsPerWeek": 3
+  }
+}
+```
+
+#### 메시지 설정
+```json
+{
+  "enableEmojis": true,
+  "maxMembersInSummary": 5,
+  "messageFormat": "full"
+}
+```
+
+## 📝 로그
+
+로그는 `logs/` 디렉토리에 저장됩니다:
+- `app.log`: 일반 애플리케이션 로그
+- `error.log`: 에러 로그
+- `debug.log`: 디버그 로그
+
+## 🔒 보안
+
+- 민감한 정보(토큰, 비밀번호)는 환경변수 사용 권장
+- API 엔드포인트에 인증 미들웨어 추가 가능
+- HTTPS 사용 권장
+
+## 🤝 기여하기
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 라이선스
+
+이 프로젝트는 ISC 라이선스 하에 있습니다.
 
 ## 📞 지원
 
-문제 발생 시 로그 파일을 확인하고 GitHub Issues에 등록해주세요.
+문제가 발생하거나 문의사항이 있으시면 GitHub Issues를 통해 연락해 주세요.
 
 ---
 
-**Made with ❤️ for efficient team management**
+**GitPulse** - GitHub 기반 팀 성과 시각화 및 자동화 솔루션

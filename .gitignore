@@ -12,9 +12,18 @@ pids
 
 # Configuration files (contain sensitive data)
 config.json
+github-config.json
+github-config.local.json
+.github-token
 
 # Logs directory
 logs/
+*.log
+
+# Cache directories
+cache/
+reports/
+backups/
 
 # IDE files
 .vscode/
@@ -37,21 +46,6 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
-
-# GitHub configuration (contains sensitive tokens)
-github-config.json
-github-config.local.json
-.github-token
-
-# Logs
-logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -77,3 +71,28 @@ jspm_packages/
 # Build directories
 dist/
 build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Database files (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Config backups
+config-backup-*.json
+config-export-*.json
+
+# Test files
+test-results/
+*.test.log

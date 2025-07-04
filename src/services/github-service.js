@@ -1,99 +1,31 @@
-// src/services/github-service.js
-// GitHub 통합 서비스
+// github-service.js
+// GitHub 기능 서비스 - 메인 애플리케이션과 GitHub 모듈을 연결
 
-const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const GitHubAnalyzer = require('../github/analyzer');
+const GitHubMessageRenderer = require('../github/message-renderer');
+const ReportManager = require('../github/report-manager');
 const logger = require('../../logger');
 
-const GITHUB_CONFIG_FILE = path.join(__dirname, '../../github-config.json');
-const PREVIEW_CACHE_DIR = path.join(__dirname, '../../cache');
-const PREVIEW_CACHE_FILE = path.join(PREVIEW_CACHE_DIR, 'last-report-preview.json');
+// 리포트 캐시 디렉토리
+const REPORTS_DIR = path.join(__dirname, '../cache/github-reports');
+if (!fs.existsSync(REPORTS_DIR)) {
+    fs.mkdirSync(REPORTS_DIR, { recursive: true });
+}
 
 class GitHubService {
     constructor() {
-        this.config = {};
+        this.analyzer = null;
+        this.renderer = null;
+        this.reportManager = null;
+        this.config = null;
         this.isEnabled = false;
-        this.currentProgress = { stage: '', percent: 0, details: '' };
-        this.isCollecting = false;
-        this.ensureCacheDirectory();
+        this.progressCallback = null;
+        this.isGenerating = false;
+        this.currentReportId = null;
+        
         this.loadConfiguration();
-    }
-
-    /**
-     * 캐시 디렉토리 생성
-     */
-    ensureCacheDirectory() {
-        try {
-            if (!fs.existsSync(PREVIEW_CACHE_DIR)) {
-                fs.mkdirSync(PREVIEW_CACHE_DIR, { recursive: true });
-                logger.info('Created cache directory for GitHub reports');
-            }
-        } catch (error) {
-            logger.error(`Error creating cache directory: ${error.message}`, error);
-        }
-    }
-
-    /**
-     * 리포트 미리보기 저장
-     * @param {Object} reportData - 리포트 데이터
-     */
-    saveReportPreview(reportData) {
-        try {
-            const cacheData = {
-                ...reportData,
-                timestamp: new Date().toISOString(),
-                generatedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-            };
-            
-            fs.writeFileSync(PREVIEW_CACHE_FILE, JSON.stringify(cacheData, null, 2));
-            logger.info('Report preview saved to cache');
-        } catch (error) {
-            logger.error(`Error saving report preview: ${error.message}`, error);
-        }
-    }
-
-    /**
-     * 저장된 리포트 미리보기 로드
-     * @returns {Object|null} - 저장된 리포트 데이터 또는 null
-     */
-    loadReportPreview() {
-        try {
-            if (fs.existsSync(PREVIEW_CACHE_FILE)) {
-                const cacheData = JSON.parse(fs.readFileSync(PREVIEW_CACHE_FILE, 'utf8'));
-                const ageHours = (new Date() - new Date(cacheData.timestamp)) / (1000 * 60 * 60);
-                
-                // 24시간 이내의 캐시만 유효
-                if (ageHours < 24) {
-                    logger.info('Loaded cached report preview');
-                    return cacheData;
-                } else {
-                    logger.info('Cached report preview is too old, ignoring');
-                }
-            }
-        } catch (error) {
-            logger.error(`Error loading report preview: ${error.message}`, error);
-        }
-        return null;
-    }
-
-    /**
-     * 진행도 업데이트
-     * @param {string} stage - 현재 단계
-     * @param {number} percent - 진행률 (0-100)
-     * @param {string} details - 상세 정보
-     */
-    updateProgress(stage, percent, details = '') {
-        this.currentProgress = { stage, percent, details };
-        logger.info(`GitHub collection progress: ${stage} (${percent}%) - ${details}`);
-    }
-
-    /**
-     * 현재 진행도 조회
-     * @returns {Object} - 현재 진행도 정보
-     */
-    getProgress() {
-        return { ...this.currentProgress, isCollecting: this.isCollecting };
     }
 
     /**
@@ -101,619 +33,594 @@ class GitHubService {
      */
     loadConfiguration() {
         try {
-            if (fs.existsSync(GITHUB_CONFIG_FILE)) {
-                const configData = fs.readFileSync(GITHUB_CONFIG_FILE, 'utf8');
-                this.config = JSON.parse(configData);
-                
-                // 토큰이 비어있으면 환경변수에서 로드
-                if (!this.config.githubToken && process.env.GITHUB_TOKEN) {
-                    this.config.githubToken = process.env.GITHUB_TOKEN;
-                }
-                
-                this.isEnabled = this.config.enabled && this.config.githubToken;
-                
-                if (this.isEnabled) {
-                    logger.info('GitHub service enabled successfully');
-                    logger.info(`Monitoring ${this.config.repositories.length} repositories`);
-                    logger.info('GitHub token loaded from configuration');
-                } else {
-                    logger.warn('GitHub service disabled (missing token or disabled in config)');
-                }
-            } else {
-                logger.warn('GitHub configuration file not found');
+            const configPath = path.join(__dirname, '../../github-config.json');
+            
+            if (!fs.existsSync(configPath)) {
+                logger.warn('GitHub configuration file not found. GitHub features will be disabled.');
                 this.isEnabled = false;
+                return;
             }
+
+            const configData = fs.readFileSync(configPath, 'utf8');
+            this.config = JSON.parse(configData);
+
+            // 필수 설정 검증
+            if (!this.config.githubToken || this.config.githubToken === 'YOUR_GITHUB_TOKEN_HERE') {
+                logger.warn('GitHub token not configured. GitHub features will be disabled.');
+                this.isEnabled = false;
+                return;
+            }
+
+            if (!this.config.repositories || this.config.repositories.length === 0) {
+                logger.warn('No repositories configured. GitHub features will be disabled.');
+                this.isEnabled = false;
+                return;
+            }
+
+            if (!this.config.teamMembers || this.config.teamMembers.length === 0) {
+                logger.warn('No team members configured. GitHub features will be disabled.');
+                this.isEnabled = false;
+                return;
+            }
+
+            // GitHub 분석기, 렌더러 및 리포트 매니저 초기화
+            this.analyzer = new GitHubAnalyzer(this.config);
+            this.renderer = new GitHubMessageRenderer(this.config.messageSettings);
+            this.reportManager = new ReportManager();
+
+            // 설정 유효성 검사
+            const validationErrors = this.analyzer.validateConfig();
+            if (validationErrors.length > 0) {
+                logger.error('GitHub configuration validation failed:', validationErrors);
+                this.isEnabled = false;
+                return;
+            }
+
+            this.isEnabled = true;
+            logger.info('GitHub service initialized successfully');
+            logger.info(`Monitoring ${this.config.repositories.length} repositories for ${this.config.teamMembers.length} team members`);
+
         } catch (error) {
-            logger.error(`Error loading GitHub configuration: ${error.message}`, error);
+            logger.error(`Failed to load GitHub configuration: ${error.message}`, error);
             this.isEnabled = false;
         }
     }
 
     /**
-     * GitHub API 호출
-     * @param {string} endpoint - API 엔드포인트
-     * @param {string} method - HTTP 메서드
-     * @param {Object} body - 요청 본문
-     * @returns {Promise<Object>} - API 응답
+     * 설정 저장
      */
-    async makeGitHubApiCall(endpoint, method = 'GET', body = null) {
-        if (!this.isEnabled) {
-            throw new Error('GitHub service is not enabled');
-        }
-
-        const url = `https://api.github.com${endpoint}`;
-        const options = {
-            method,
-            headers: {
-                'Authorization': `token ${this.config.githubToken}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'Naverworks-Message-Cron-Server'
-            }
-        };
-
-        if (body) {
-            options.headers['Content-Type'] = 'application/json';
-            options.body = JSON.stringify(body);
-        }
-
+    saveConfiguration() {
         try {
-            const response = await fetch(url, options);
-            
-            if (!response.ok) {
-                throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-            }
-
-            return await response.json();
+            const configPath = path.join(__dirname, 'github-config.json');
+            fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2), 'utf8');
+            logger.info('GitHub configuration saved successfully');
         } catch (error) {
-            logger.error(`GitHub API call failed: ${error.message}`, error);
+            logger.error(`Failed to save GitHub configuration: ${error.message}`, error);
             throw error;
         }
     }
 
     /**
-     * 리포지토리 커밋 정보 조회
-     * @param {string} owner - 리포지토리 소유자
-     * @param {string} repo - 리포지토리 이름
-     * @param {string} since - 시작 날짜 (ISO 8601)
-     * @param {string} until - 종료 날짜 (ISO 8601)
-     * @returns {Promise<Array>} - 커밋 목록
+     * 진행도 콜백 설정
+     * @param {Function} callback - 진행도 콜백 함수
      */
-    async getRepositoryCommits(owner, repo, since, until) {
-        try {
-            const endpoint = `/repos/${owner}/${repo}/commits`;
-            let url = endpoint + '?per_page=100';
-            
-            if (since) url += `&since=${since}`;
-            if (until) url += `&until=${until}`;
-
-            const commits = await this.makeGitHubApiCall(url);
-            
-            // 각 커밋의 상세 정보 조회 (stats 포함)
-            const detailedCommits = [];
-            for (const commit of commits.slice(0, 50)) { // API 제한으로 최대 50개만 상세 조회
-                try {
-                    const detailedCommit = await this.makeGitHubApiCall(`/repos/${owner}/${repo}/commits/${commit.sha}`);
-                    detailedCommits.push({
-                        sha: commit.sha,
-                        author: commit.author?.login || 'unknown',
-                        authorName: commit.commit.author.name,
-                        authorEmail: commit.commit.author.email,
-                        message: commit.commit.message,
-                        date: commit.commit.author.date,
-                        additions: detailedCommit.stats?.additions || 0,
-                        deletions: detailedCommit.stats?.deletions || 0,
-                        total: detailedCommit.stats?.total || 0
-                    });
-                    
-                    // API 호출 제한 방지를 위한 딜레이
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                } catch (error) {
-                    logger.warn(`Error fetching detailed commit ${commit.sha}: ${error.message}`);
-                    // 상세 정보 조회 실패 시 기본 정보만 사용
-                    detailedCommits.push({
-                        sha: commit.sha,
-                        author: commit.author?.login || 'unknown',
-                        authorName: commit.commit.author.name,
-                        authorEmail: commit.commit.author.email,
-                        message: commit.commit.message,
-                        date: commit.commit.author.date,
-                        additions: 0,
-                        deletions: 0,
-                        total: 0
-                    });
-                }
-            }
-            
-            return detailedCommits;
-        } catch (error) {
-            logger.error(`Error fetching commits for ${owner}/${repo}: ${error.message}`, error);
-            return [];
-        }
+    setProgressCallback(callback) {
+        this.progressCallback = callback;
     }
 
     /**
-     * 리포지토리 Pull Request 정보 조회
-     * @param {string} owner - 리포지토리 소유자
-     * @param {string} repo - 리포지토리 이름
-     * @param {string} since - 시작 날짜 (ISO 8601)
-     * @param {string} until - 종료 날짜 (ISO 8601)
-     * @returns {Promise<Array>} - PR 목록
+     * 진행도 보고
+     * @param {string} message - 진행 메시지
+     * @param {number} percentage - 진행률 (0-100)
+     * @param {Object} details - 추가 세부 정보
      */
-    async getRepositoryPullRequests(owner, repo, since, until) {
-        try {
-            const endpoint = `/repos/${owner}/${repo}/pulls`;
-            const url = endpoint + '?state=all&per_page=100&sort=updated&direction=desc';
-
-            const pullRequests = await this.makeGitHubApiCall(url);
-            
-            // 날짜 범위 필터링
-            const filteredPRs = pullRequests.filter(pr => {
-                const createdDate = new Date(pr.created_at);
-                const sinceDate = since ? new Date(since) : new Date(0);
-                const untilDate = until ? new Date(until) : new Date();
-                
-                return createdDate >= sinceDate && createdDate <= untilDate;
-            });
-
-            // 각 PR의 상세 정보 조회 (additions, deletions, changed_files 포함)
-            const detailedPRs = [];
-            for (const pr of filteredPRs.slice(0, 50)) { // API 제한으로 최대 50개만 상세 조회
-                try {
-                    const detailedPR = await this.makeGitHubApiCall(`/repos/${owner}/${repo}/pulls/${pr.number}`);
-                    detailedPRs.push({
-                        number: pr.number,
-                        title: pr.title,
-                        author: pr.user.login,
-                        state: pr.state,
-                        createdAt: pr.created_at,
-                        closedAt: pr.closed_at,
-                        mergedAt: pr.merged_at,
-                        additions: detailedPR.additions || 0,
-                        deletions: detailedPR.deletions || 0,
-                        changedFiles: detailedPR.changed_files || 0
-                    });
-                    
-                    // API 호출 제한 방지를 위한 딜레이
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                } catch (error) {
-                    logger.warn(`Error fetching detailed PR ${pr.number}: ${error.message}`);
-                    // 상세 정보 조회 실패 시 기본 정보만 사용
-                    detailedPRs.push({
-                        number: pr.number,
-                        title: pr.title,
-                        author: pr.user.login,
-                        state: pr.state,
-                        createdAt: pr.created_at,
-                        closedAt: pr.closed_at,
-                        mergedAt: pr.merged_at,
-                        additions: 0,
-                        deletions: 0,
-                        changedFiles: 0
-                    });
-                }
-            }
-            
-            return detailedPRs;
-        } catch (error) {
-            logger.error(`Error fetching pull requests for ${owner}/${repo}: ${error.message}`, error);
-            return [];
-        }
-    }
-
-    /**
-     * 팀원별 활동 통계 수집
-     * @param {string} startDate - 시작 날짜 (YYYY-MM-DD)
-     * @param {string} endDate - 종료 날짜 (YYYY-MM-DD)
-     * @returns {Promise<Object>} - 팀원별 통계
-     */
-    async collectTeamStats(startDate, endDate) {
-        if (!this.isEnabled) {
-            throw new Error('GitHub service is not enabled');
-        }
-
-        const since = new Date(startDate).toISOString();
-        const until = new Date(endDate).toISOString();
+    reportProgress(message, percentage = null, details = {}) {
+        const progressData = {
+            message,
+            percentage,
+            timestamp: new Date().toISOString(),
+            reportId: this.currentReportId,
+            stage: details.stage || 'processing',
+            currentStep: details.currentStep || null,
+            totalSteps: details.totalSteps || null,
+            repository: details.repository || null,
+            member: details.member || null
+        };
         
-        const teamStats = {};
-        
-        // 팀 매핑 정보로 초기화
-        Object.keys(this.config.teamMapping).forEach(memberId => {
-            const member = this.config.teamMapping[memberId];
-            teamStats[memberId] = {
-                githubUsername: member.githubUsername,
-                name: member.name,
-                email: member.email,
-                commits: 0,
-                pullRequests: 0,
-                linesAdded: 0,
-                linesDeleted: 0,
-                repositories: new Set()
-            };
-        });
-
-        // 각 리포지토리에서 데이터 수집
-        for (const repo of this.config.repositories) {
-            if (!repo.enabled) continue;
-
-            logger.info(`Collecting stats from ${repo.owner}/${repo.name}`);
-            
-            try {
-                // 커밋 정보 수집
-                const commits = await this.getRepositoryCommits(repo.owner, repo.name, since, until);
-                
-                commits.forEach(commit => {
-                    // GitHub 사용자명으로 매핑
-                    const member = Object.values(this.config.teamMapping).find(m => 
-                        m.githubUsername === commit.author || 
-                        m.email === commit.authorEmail
-                    );
-                    
-                    if (member) {
-                        const memberId = Object.keys(this.config.teamMapping).find(id => 
-                            this.config.teamMapping[id] === member
-                        );
-                        
-                        if (memberId && teamStats[memberId]) {
-                            teamStats[memberId].commits++;
-                            teamStats[memberId].linesAdded += commit.additions;
-                            teamStats[memberId].linesDeleted += commit.deletions;
-                            teamStats[memberId].repositories.add(repo.name);
-                            
-                            logger.debug(`Added commit for ${member.name}: +${commit.additions} -${commit.deletions} in ${repo.name}`);
-                        }
-                    } else {
-                        logger.debug(`Unknown author: ${commit.author} (${commit.authorEmail}) in ${repo.name}`);
-                    }
-                });
-
-                // PR 정보 수집
-                const pullRequests = await this.getRepositoryPullRequests(repo.owner, repo.name, since, until);
-                
-                pullRequests.forEach(pr => {
-                    const member = Object.values(this.config.teamMapping).find(m => 
-                        m.githubUsername === pr.author
-                    );
-                    
-                    if (member) {
-                        const memberId = Object.keys(this.config.teamMapping).find(id => 
-                            this.config.teamMapping[id] === member
-                        );
-                        
-                        if (memberId && teamStats[memberId]) {
-                            teamStats[memberId].pullRequests++;
-                            teamStats[memberId].linesAdded += pr.additions;
-                            teamStats[memberId].linesDeleted += pr.deletions;
-                            teamStats[memberId].repositories.add(repo.name);
-                            
-                            logger.debug(`Added PR for ${member.name}: +${pr.additions} -${pr.deletions} in ${repo.name}`);
-                        }
-                    } else {
-                        logger.debug(`Unknown PR author: ${pr.author} in ${repo.name}`);
-                    }
-                });
-                
-                // API 호출 제한 방지를 위한 딜레이
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-            } catch (error) {
-                logger.error(`Error collecting stats from ${repo.owner}/${repo.name}: ${error.message}`, error);
-            }
+        if (this.progressCallback) {
+            this.progressCallback(progressData);
         }
-
-        // Set을 Array로 변환
-        Object.keys(teamStats).forEach(memberId => {
-            teamStats[memberId].repositories = Array.from(teamStats[memberId].repositories);
-        });
-
-        return teamStats;
+        
+        const progressText = percentage !== null ? ` (${percentage}%)` : '';
+        const stepText = details.currentStep && details.totalSteps ? ` [${details.currentStep}/${details.totalSteps}]` : '';
+        logger.info(`GitHub Report Progress: ${message}${progressText}${stepText}`);
+        
+        // 진행도가 100%이거나 완료 단계인 경우 리포트 ID 초기화
+        if (percentage === 100 || details.stage === 'completed' || details.stage === 'error') {
+            this.currentReportId = null;
+        }
     }
 
+
     /**
-     * 주간 리포트 생성
-     * @returns {Promise<Object>} - 리포트 결과
+     * 주간 GitHub 리포트 생성 (진행도 표시 및 캐시 포함)
      */
     async generateWeeklyReport() {
         try {
-            const endDate = new Date();
-            const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-            
-            const startStr = startDate.toISOString().split('T')[0];
-            const endStr = endDate.toISOString().split('T')[0];
-            
-            const stats = await this.collectTeamStats(startStr, endStr);
-            
-            let message = `🔥 이번 주 개발 활동 리포트 (${startStr} ~ ${endStr}) 🔥\n\n`;
-            
-            // 활동이 있는 팀원만 필터링
-            const activeMembers = Object.entries(stats)
-                .filter(([_, data]) => data.commits > 0 || data.pullRequests > 0)
-                .sort((a, b) => b[1].commits - a[1].commits);
-
-            if (activeMembers.length === 0) {
-                message += "📝 이번 주 활동 내역이 없습니다.\n";
-            } else {
-                activeMembers.forEach(([memberId, data]) => {
-                    message += `👩‍💻 ${data.name} (${data.githubUsername})\n`;
-                    message += `  - 커밋: ${data.commits}회\n`;
-                    message += `  - PR: ${data.pullRequests}건\n`;
-                    message += `  - 코드 변경: +${data.linesAdded} / -${data.linesDeleted}\n`;
-                    message += `  - 활동 리포지토리: ${data.repositories.join(', ')}\n\n`;
-                });
-                
-                // 전체 통계
-                const totalCommits = activeMembers.reduce((sum, [_, data]) => sum + data.commits, 0);
-                const totalPRs = activeMembers.reduce((sum, [_, data]) => sum + data.pullRequests, 0);
-                const totalAdded = activeMembers.reduce((sum, [_, data]) => sum + data.linesAdded, 0);
-                const totalDeleted = activeMembers.reduce((sum, [_, data]) => sum + data.linesDeleted, 0);
-                
-                message += `📊 전체 팀 활동 요약:\n`;
-                message += `  - 총 커밋: ${totalCommits}회\n`;
-                message += `  - 총 PR: ${totalPRs}건\n`;
-                message += `  - 총 코드 변경: +${totalAdded} / -${totalDeleted}\n`;
+            if (!this.isEnabled) {
+                return { success: false, message: 'GitHub service is not enabled' };
             }
-            
-            message += `\n💡 GitHub 리포지토리:\n`;
-            this.config.repositories.forEach(repo => {
-                if (repo.enabled) {
-                    message += `  - ${repo.name}: ${repo.url}\n`;
-                }
+
+            if (this.isGenerating) {
+                return { success: false, message: '이미 리포트를 생성 중입니다.' };
+            }
+
+            this.isGenerating = true;
+            this.currentReportId = this.reportManager.generateReportId();
+            this.reportProgress('주간 리포트 생성을 시작합니다...', 0, { stage: 'initializing' });
+
+            // 캐시된 리포트 확인
+            this.reportProgress('캐시된 리포트를 확인하고 있습니다...', 5, { stage: 'cache_check' });
+            const cachedReport = this.reportManager.loadLatestCachedReport('weekly');
+            if (cachedReport) {
+                this.isGenerating = false;
+                logger.info('Using cached weekly report');
+                this.reportProgress('캐시된 리포트를 사용합니다.', 100, { stage: 'completed' });
+                return {
+                    success: true,
+                    message: cachedReport.content,
+                    data: cachedReport.metadata,
+                    cached: true,
+                    reportId: cachedReport.id
+                };
+            }
+
+            // 주간 기간 계산
+            this.reportProgress('분석 기간을 계산하고 있습니다...', 10, { stage: 'date_calculation' });
+            const today = new Date();
+            const kstToday = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+            const dayOfWeek = kstToday.getDay();
+            const lastMonday = new Date(kstToday);
+            lastMonday.setDate(kstToday.getDate() - dayOfWeek - 6);
+            const lastSunday = new Date(lastMonday);
+            lastSunday.setDate(lastMonday.getDate() + 6);
+
+            const startDate = lastMonday.toISOString().split('T')[0];
+            const endDate = lastSunday.toISOString().split('T')[0];
+
+            this.reportProgress(`${startDate} ~ ${endDate} 기간의 GitHub 활동을 분석하고 있습니다...`, 20, {
+                stage: 'data_analysis',
+                currentStep: 1,
+                totalSteps: 4
+            });
+
+            // 리포지토리별 데이터 수집
+            this.reportProgress(`${this.config.repositories.length}개 리포지토리에서 데이터를 수집하고 있습니다...`, 40, {
+                stage: 'data_collection',
+                currentStep: 2,
+                totalSteps: 4
+            });
+            const teamStats = await this.analyzer.analyzeTeamContributions(startDate, endDate, (repoProgress) => {
+                // 리포지토리별 진행도 업데이트
+                this.reportProgress(`리포지토리 '${repoProgress.repository}' 분석 중...`, 40 + (repoProgress.percentage * 0.3), {
+                    stage: 'data_collection',
+                    currentStep: 2,
+                    totalSteps: 4,
+                    repository: repoProgress.repository
+                });
             });
             
+            this.reportProgress('팀 통계를 계산하고 있습니다...', 70, {
+                stage: 'statistics_calculation',
+                currentStep: 3,
+                totalSteps: 4
+            });
+            const teamSummary = this.analyzer.calculateTeamStats(teamStats);
+
+            // 이전 주와 비교 (옵션)
+            let comparison = null;
+            if (this.config.analytics?.enablePeriodComparison) {
+                this.reportProgress('이전 주 데이터와 비교하고 있습니다...', 80, {
+                    stage: 'comparison',
+                    currentStep: 3.5,
+                    totalSteps: 4
+                });
+                const prevStartDate = new Date(lastMonday);
+                prevStartDate.setDate(lastMonday.getDate() - 7);
+                const prevEndDate = new Date(lastSunday);
+                prevEndDate.setDate(lastSunday.getDate() - 7);
+                
+                comparison = await this.analyzer.calculatePeriodComparison(
+                    teamStats,
+                    prevStartDate.toISOString().split('T')[0],
+                    prevEndDate.toISOString().split('T')[0]
+                );
+            }
+
+            // 메시지 렌더링
+            this.reportProgress('리포트 메시지를 생성하고 있습니다...', 90, {
+                stage: 'message_rendering',
+                currentStep: 4,
+                totalSteps: 4
+            });
+            const periodInfo = { startDate, endDate };
+            const message = this.renderer.renderWeeklyReport(teamStats, teamSummary, periodInfo, comparison);
+
+            // 리포트 매니저에 저장
+            this.reportProgress('리포트를 저장하고 있습니다...', 95, { stage: 'saving' });
+            const data = {
+                teamStats,
+                teamSummary,
+                periodInfo,
+                comparison
+            };
+            
+            const saveResult = this.reportManager.savePreviewReport('weekly', message, {
+                period: periodInfo,
+                teamMemberCount: this.config.teamMembers.length,
+                repositoryCount: this.config.repositories.length,
+                totalCommits: teamSummary.totalCommits,
+                totalPRs: teamSummary.totalPRs,
+                totalReviews: teamSummary.totalReviews,
+                hasComparison: !!comparison
+            });
+
+            this.reportProgress('주간 리포트 생성이 완료되었습니다!', 100, { stage: 'completed' });
+            this.isGenerating = false;
+            
+            logger.info('Weekly GitHub report generated successfully');
             return {
                 success: true,
                 message: message,
-                data: stats
+                data: data,
+                reportId: saveResult.reportId,
+                cached: false
             };
-            
+
         } catch (error) {
-            logger.error(`Error generating weekly report: ${error.message}`, error);
+            this.isGenerating = false;
+            this.reportProgress('리포트 생성 중 오류가 발생했습니다.', null, { stage: 'error' });
+            logger.error(`Failed to generate weekly GitHub report: ${error.message}`, error);
             return {
                 success: false,
-                message: `주간 리포트 생성 중 오류가 발생했습니다: ${error.message}`
+                message: 'GitHub 주간 리포트 생성 중 오류가 발생했습니다.',
+                error: error.message
             };
         }
     }
 
     /**
-     * 월간 리포트 생성
-     * @returns {Promise<Object>} - 리포트 결과
+     * 주간 GitHub 리포트 생성 및 전송 (기존 메서드 유지)
+     */
+    async generateAndSendWeeklyReport() {
+        const result = await this.generateWeeklyReport();
+        return result;
+    }
+
+    /**
+     * 월간 GitHub 리포트 생성 (진행도 표시 및 캐시 포함)
      */
     async generateMonthlyReport() {
         try {
-            const endDate = new Date();
-            const startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-            
-            const startStr = startDate.toISOString().split('T')[0];
-            const endStr = endDate.toISOString().split('T')[0];
-            
-            const stats = await this.collectTeamStats(startStr, endStr);
-            
-            let message = `📈 이번 달 개발 활동 리포트 (${startStr} ~ ${endStr}) 📈\n\n`;
-            
-            // 활동이 있는 팀원만 필터링 및 정렬
-            const activeMembers = Object.entries(stats)
-                .filter(([_, data]) => data.commits > 0 || data.pullRequests > 0)
-                .sort((a, b) => b[1].commits - a[1].commits);
-
-            if (activeMembers.length === 0) {
-                message += "📝 이번 달 활동 내역이 없습니다.\n";
-            } else {
-                activeMembers.forEach(([memberId, data]) => {
-                    message += `👩‍💻 ${data.name} (${data.githubUsername})\n`;
-                    message += `  - 커밋: ${data.commits}회\n`;
-                    message += `  - PR: ${data.pullRequests}건\n`;
-                    message += `  - 코드 변경: +${data.linesAdded} / -${data.linesDeleted}\n`;
-                    message += `  - 활동 리포지토리: ${data.repositories.join(', ')}\n\n`;
-                });
-                
-                // 전체 통계
-                const totalCommits = activeMembers.reduce((sum, [_, data]) => sum + data.commits, 0);
-                const totalPRs = activeMembers.reduce((sum, [_, data]) => sum + data.pullRequests, 0);
-                const totalAdded = activeMembers.reduce((sum, [_, data]) => sum + data.linesAdded, 0);
-                const totalDeleted = activeMembers.reduce((sum, [_, data]) => sum + data.linesDeleted, 0);
-                
-                message += `📊 전체 팀 활동 요약:\n`;
-                message += `  - 총 커밋: ${totalCommits}회\n`;
-                message += `  - 총 PR: ${totalPRs}건\n`;
-                message += `  - 총 코드 변경: +${totalAdded} / -${totalDeleted}\n`;
+            if (!this.isEnabled) {
+                return { success: false, message: 'GitHub service is not enabled' };
             }
+
+            if (this.isGenerating) {
+                return { success: false, message: '이미 리포트를 생성 중입니다.' };
+            }
+
+            this.isGenerating = true;
+            this.currentReportId = this.reportManager.generateReportId();
+            this.reportProgress('월간 리포트 생성을 시작합니다...', 0, { stage: 'initializing' });
+
+            // 캐시된 리포트 확인
+            this.reportProgress('캐시된 리포트를 확인하고 있습니다...', 5, { stage: 'cache_check' });
+            const cachedReport = this.reportManager.loadLatestCachedReport('monthly');
+            if (cachedReport) {
+                // 월간 리포트는 7일 이내 캐시 재사용
+                const now = new Date();
+                const generatedAt = new Date(cachedReport.metadata.generatedAt);
+                const daysDiff = (now - generatedAt) / (1000 * 60 * 60 * 24);
+                
+                if (daysDiff < 7) {
+                    this.isGenerating = false;
+                    logger.info('Using cached monthly report');
+                    this.reportProgress('캐시된 리포트를 사용합니다.', 100, { stage: 'completed' });
+                    return {
+                        success: true,
+                        message: cachedReport.content,
+                        data: cachedReport.metadata,
+                        cached: true,
+                        reportId: cachedReport.id
+                    };
+                }
+            }
+
+            // 월간 기간 계산
+            this.reportProgress('분석 기간을 계산하고 있습니다...', 10, { stage: 'date_calculation' });
+            const today = new Date();
+            const kstToday = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+            const firstDayOfLastMonth = new Date(kstToday.getFullYear(), kstToday.getMonth() - 1, 1);
+            const lastDayOfLastMonth = new Date(kstToday.getFullYear(), kstToday.getMonth(), 0);
+
+            const startDate = firstDayOfLastMonth.toISOString().split('T')[0];
+            const endDate = lastDayOfLastMonth.toISOString().split('T')[0];
+
+            this.reportProgress(`${startDate} ~ ${endDate} 기간의 GitHub 활동을 분석하고 있습니다...`, 20, {
+                stage: 'data_analysis',
+                currentStep: 1,
+                totalSteps: 4
+            });
+
+            // 리포지토리별 데이터 수집
+            this.reportProgress(`${this.config.repositories.length}개 리포지토리에서 데이터를 수집하고 있습니다...`, 40, {
+                stage: 'data_collection',
+                currentStep: 2,
+                totalSteps: 4
+            });
+            const teamStats = await this.analyzer.analyzeTeamContributions(startDate, endDate, (repoProgress) => {
+                // 리포지토리별 진행도 업데이트
+                this.reportProgress(`리포지토리 '${repoProgress.repository}' 분석 중...`, 40 + (repoProgress.percentage * 0.3), {
+                    stage: 'data_collection',
+                    currentStep: 2,
+                    totalSteps: 4,
+                    repository: repoProgress.repository
+                });
+            });
             
+            this.reportProgress('팀 통계를 계산하고 있습니다...', 70, {
+                stage: 'statistics_calculation',
+                currentStep: 3,
+                totalSteps: 4
+            });
+            const teamSummary = this.analyzer.calculateTeamStats(teamStats);
+
+            // 이전 달과 비교 (옵션)
+            let comparison = null;
+            if (this.config.analytics?.enablePeriodComparison) {
+                this.reportProgress('이전 달 데이터와 비교하고 있습니다...', 80, {
+                    stage: 'comparison',
+                    currentStep: 3.5,
+                    totalSteps: 4
+                });
+                const prevFirstDay = new Date(firstDayOfLastMonth);
+                prevFirstDay.setMonth(prevFirstDay.getMonth() - 1);
+                const prevLastDay = new Date(firstDayOfLastMonth);
+                prevLastDay.setDate(0);
+                
+                comparison = await this.analyzer.calculatePeriodComparison(
+                    teamStats,
+                    prevFirstDay.toISOString().split('T')[0],
+                    prevLastDay.toISOString().split('T')[0]
+                );
+            }
+
+            // 메시지 렌더링
+            this.reportProgress('리포트 메시지를 생성하고 있습니다...', 90, {
+                stage: 'message_rendering',
+                currentStep: 4,
+                totalSteps: 4
+            });
+            const periodInfo = { startDate, endDate };
+            const message = this.renderer.renderMonthlyReport(teamStats, teamSummary, periodInfo, comparison);
+
+            // 리포트 매니저에 저장
+            this.reportProgress('리포트를 저장하고 있습니다...', 95, { stage: 'saving' });
+            const data = {
+                teamStats,
+                teamSummary,
+                periodInfo,
+                comparison
+            };
+            
+            const saveResult = this.reportManager.savePreviewReport('monthly', message, {
+                period: periodInfo,
+                teamMemberCount: this.config.teamMembers.length,
+                repositoryCount: this.config.repositories.length,
+                totalCommits: teamSummary.totalCommits,
+                totalPRs: teamSummary.totalPRs,
+                totalReviews: teamSummary.totalReviews,
+                hasComparison: !!comparison
+            });
+
+            this.reportProgress('월간 리포트 생성이 완료되었습니다!', 100, { stage: 'completed' });
+            this.isGenerating = false;
+            
+            logger.info('Monthly GitHub report generated successfully');
             return {
                 success: true,
                 message: message,
-                data: stats
+                data: data,
+                reportId: saveResult.reportId,
+                cached: false
             };
-            
+
         } catch (error) {
-            logger.error(`Error generating monthly report: ${error.message}`, error);
+            this.isGenerating = false;
+            this.reportProgress('리포트 생성 중 오류가 발생했습니다.', null, { stage: 'error' });
+            logger.error(`Failed to generate monthly GitHub report: ${error.message}`, error);
             return {
                 success: false,
-                message: `월간 리포트 생성 중 오류가 발생했습니다: ${error.message}`
+                message: 'GitHub 월간 리포트 생성 중 오류가 발생했습니다.',
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * 월간 GitHub 리포트 생성 및 전송 (기존 메서드 유지)
+     */
+    async generateAndSendMonthlyReport() {
+        const result = await this.generateMonthlyReport();
+        return result;
+    }
+
+    /**
+     * 활동 알림 체크 및 전송
+     */
+    async checkAndSendActivityAlerts() {
+        try {
+            if (!this.isEnabled || !this.config.reporting.alertThresholds.enableLowActivityAlerts) {
+                return { success: false, message: 'Activity alerts are not enabled' };
+            }
+
+            logger.info('Checking GitHub activity alerts');
+
+            // 최근 7일 데이터 분석
+            const endDate = new Date().toISOString().split('T')[0];
+            const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            const teamStats = await this.analyzer.analyzeTeamContributions(startDate, endDate);
+            const alertMessage = this.renderer.renderActivityAlert(teamStats, this.config.reporting.alertThresholds);
+
+            if (alertMessage) {
+                logger.info('Activity alert generated');
+                return {
+                    success: true,
+                    message: alertMessage,
+                    data: { teamStats, periodInfo: { startDate, endDate } }
+                };
+            } else {
+                logger.info('No activity alerts needed');
+                return { success: false, message: 'No alerts needed' };
+            }
+
+        } catch (error) {
+            logger.error(`Failed to check activity alerts: ${error.message}`, error);
+            return {
+                success: false,
+                message: 'GitHub 활동 알림 체크 중 오류가 발생했습니다.',
+                error: error.message
             };
         }
     }
 
     /**
      * 커스텀 기간 리포트 생성
-     * @param {string} startDate - 시작 날짜 (YYYY-MM-DD)
-     * @param {string} endDate - 종료 날짜 (YYYY-MM-DD)
-     * @returns {Promise<Object>} - 리포트 결과
      */
     async generateCustomPeriodReport(startDate, endDate) {
         try {
-            const stats = await this.collectTeamStats(startDate, endDate);
-            
-            let message = `📊 커스텀 기간 개발 활동 리포트 (${startDate} ~ ${endDate}) 📊\n\n`;
-            
-            const activeMembers = Object.entries(stats)
-                .filter(([_, data]) => data.commits > 0 || data.pullRequests > 0)
-                .sort((a, b) => b[1].commits - a[1].commits);
-
-            if (activeMembers.length === 0) {
-                message += "📝 해당 기간 활동 내역이 없습니다.\n";
-            } else {
-                activeMembers.forEach(([memberId, data]) => {
-                    message += `👩‍💻 ${data.name} (${data.githubUsername})\n`;
-                    message += `  - 커밋: ${data.commits}회\n`;
-                    message += `  - PR: ${data.pullRequests}건\n`;
-                    message += `  - 코드 변경: +${data.linesAdded} / -${data.linesDeleted}\n`;
-                    message += `  - 활동 리포지토리: ${data.repositories.join(', ')}\n\n`;
-                });
+            if (!this.isEnabled) {
+                return { success: false, message: 'GitHub service is not enabled' };
             }
-            
+
+            logger.info(`Generating custom period report: ${startDate} to ${endDate}`);
+
+            const teamStats = await this.analyzer.analyzeTeamContributions(startDate, endDate);
+            const teamSummary = this.analyzer.calculateTeamStats(teamStats);
+
+            const periodInfo = { startDate, endDate };
+            const message = this.renderer.renderWeeklyReport(teamStats, teamSummary, periodInfo);
+
             return {
                 success: true,
                 message: message,
-                data: stats
+                data: { teamStats, teamSummary, periodInfo }
             };
-            
+
         } catch (error) {
-            logger.error(`Error generating custom period report: ${error.message}`, error);
+            logger.error(`Failed to generate custom period report: ${error.message}`, error);
             return {
                 success: false,
-                message: `커스텀 기간 리포트 생성 중 오류가 발생했습니다: ${error.message}`
+                message: 'GitHub 커스텀 리포트 생성 중 오류가 발생했습니다.',
+                error: error.message
             };
         }
     }
 
     /**
-     * 서비스 상태 조회
-     * @returns {Object} - 서비스 상태
+     * 개별 멤버 통계 조회
      */
-    getServiceStatus() {
-        return {
-            isEnabled: this.isEnabled,
-            repositories: this.config.repositories || [],
-            teamMembers: Object.keys(this.config.teamMapping || {}),
-            reporting: this.config.reporting || {}
-        };
+    async getMemberStats(githubUsername, startDate, endDate) {
+        try {
+            if (!this.isEnabled) {
+                return { success: false, message: 'GitHub service is not enabled' };
+            }
+
+            logger.info(`Getting member stats for ${githubUsername}: ${startDate} to ${endDate}`);
+
+            const teamStats = await this.analyzer.analyzeTeamContributions(startDate, endDate);
+            const memberStats = teamStats[githubUsername];
+
+            if (!memberStats) {
+                return { success: false, message: 'Member not found' };
+            }
+
+            return {
+                success: true,
+                data: memberStats
+            };
+
+        } catch (error) {
+            logger.error(`Failed to get member stats: ${error.message}`, error);
+            return {
+                success: false,
+                message: '멤버 통계 조회 중 오류가 발생했습니다.',
+                error: error.message
+            };
+        }
     }
 
     /**
      * 설정 업데이트
-     * @param {Object} newConfig - 새로운 설정
-     * @returns {Object} - 업데이트 결과
      */
     updateConfiguration(newConfig) {
         try {
-            // 기존 설정과 병합
-            const updatedConfig = { ...this.config, ...newConfig };
+            this.config = { ...this.config, ...newConfig };
+            this.saveConfiguration();
             
-            // 파일에 저장
-            fs.writeFileSync(GITHUB_CONFIG_FILE, JSON.stringify(updatedConfig, null, 2));
-            
-            // 메모리 설정 업데이트
-            this.config = updatedConfig;
-            this.isEnabled = this.config.enabled && this.config.githubToken;
+            // 서비스 재초기화
+            this.loadConfiguration();
             
             logger.info('GitHub configuration updated successfully');
-            
-            return {
-                success: true,
-                message: 'GitHub 설정이 성공적으로 업데이트되었습니다.'
-            };
+            return { success: true, message: 'Configuration updated successfully' };
             
         } catch (error) {
-            logger.error(`Error updating GitHub configuration: ${error.message}`, error);
-            return {
-                success: false,
-                message: `설정 업데이트 중 오류가 발생했습니다: ${error.message}`
-            };
+            logger.error(`Failed to update GitHub configuration: ${error.message}`, error);
+            return { success: false, message: 'Failed to update configuration', error: error.message };
         }
     }
 
     /**
-     * 멤버 통계 조회
-     * @param {string} githubUsername - GitHub 사용자명
-     * @param {string} startDate - 시작 날짜 (YYYY-MM-DD)
-     * @param {string} endDate - 종료 날짜 (YYYY-MM-DD)
-     * @returns {Promise<Object>} - 멤버 통계 결과
+     * 서비스 상태 확인
      */
-    async getMemberStats(githubUsername, startDate, endDate) {
-        try {
-            const stats = await this.collectTeamStats(startDate, endDate);
-            
-            // 해당 사용자 찾기
-            const member = Object.entries(this.config.teamMapping).find(([_, data]) => 
-                data.githubUsername === githubUsername
-            );
-            
-            if (!member) {
-                return {
-                    success: false,
-                    message: '해당 GitHub 사용자를 찾을 수 없습니다.'
-                };
+    getServiceStatus() {
+        const storageStats = this.getStorageStats();
+        
+        return {
+            isEnabled: this.isEnabled,
+            isGenerating: this.isGenerating,
+            currentReportId: this.currentReportId,
+            config: this.config ? {
+                repositoryCount: this.config.repositories?.length || 0,
+                teamMemberCount: this.config.teamMembers?.length || 0,
+                weeklyReportsEnabled: this.config.reporting?.weeklyReports?.enabled || false,
+                monthlyReportsEnabled: this.config.reporting?.monthlyReports?.enabled || false,
+                alertsEnabled: this.config.reporting?.alertThresholds?.enableLowActivityAlerts || false,
+                periodComparisonEnabled: this.config.analytics?.enablePeriodComparison || false
+            } : null,
+            storage: storageStats,
+            capabilities: {
+                progressTracking: true,
+                caching: true,
+                archiving: true,
+                reportHistory: true
             }
-            
-            const [memberId] = member;
-            const memberStats = stats[memberId];
-            
-            if (!memberStats) {
-                return {
-                    success: false,
-                    message: '해당 멤버의 통계 정보를 찾을 수 없습니다.'
-                };
-            }
-            
-            return {
-                success: true,
-                data: memberStats,
-                message: `${memberStats.name} 님의 통계 정보를 조회했습니다.`
-            };
-            
-        } catch (error) {
-            logger.error(`Error getting member stats: ${error.message}`, error);
-            return {
-                success: false,
-                message: `멤버 통계 조회 중 오류가 발생했습니다: ${error.message}`
-            };
-        }
+        };
     }
 
     /**
-     * 비활성 멤버 알림 체크
-     * @returns {Promise<Object>} - 알림 결과
+     * 진행도 추적 취소
      */
-    async checkAndSendActivityAlerts() {
-        try {
-            const endDate = new Date();
-            const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-            
-            const startStr = startDate.toISOString().split('T')[0];
-            const endStr = endDate.toISOString().split('T')[0];
-            
-            const stats = await this.collectTeamStats(startStr, endStr);
-            
-            // 비활성 멤버 찾기
-            const inactiveMembers = Object.entries(stats)
-                .filter(([_, data]) => data.commits === 0 && data.pullRequests === 0)
-                .map(([memberId, data]) => data.name);
-            
-            if (inactiveMembers.length === 0) {
-                return {
-                    success: false,
-                    message: '모든 멤버가 활성상태입니다.'
-                };
-            }
-            
-            const message = `⚠️ 비활성 멤버 알림 ⚠️\n\n` +
-                           `지난 7일간 GitHub 활동이 없는 멤버:\n` +
-                           inactiveMembers.map(name => `- ${name}`).join('\n') +
-                           `\n\n활동 상태를 확인해주세요! 💪`;
-            
-            return {
-                success: true,
-                message: message,
-                data: { inactiveMembers }
-            };
-            
-        } catch (error) {
-            logger.error(`Error checking activity alerts: ${error.message}`, error);
-            return {
-                success: false,
-                message: `비활성 멤버 체크 중 오류가 발생했습니다: ${error.message}`
-            };
+    cancelCurrentGeneration() {
+        if (this.isGenerating) {
+            this.isGenerating = false;
+            this.reportProgress('리포트 생성이 취소되었습니다.', null, { stage: 'cancelled' });
+            logger.info('GitHub report generation cancelled by user');
+            return { success: true, message: '리포트 생성이 취소되었습니다.' };
         }
+        return { success: false, message: '진행 중인 리포트 생성이 없습니다.' };
     }
 }
 
