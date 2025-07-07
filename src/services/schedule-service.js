@@ -11,7 +11,6 @@ class ScheduleService {
             weeklyDutyAssignment: '0 8 * * 1', // 매주 월요일 오전 8시
             dutyReminders: '0 14,16 * * *', // 매일 오후 2시, 4시
             codeReviewPairs: '0 9 * * 1', // 매주 월요일 오전 9시
-            laptopDutyNotifications: '0 9 * * *', // 매일 오전 9시
             githubWeeklyReport: '0 9 * * 1', // 매주 월요일 오전 9시
             githubMonthlyReport: '0 9 1 * *', // 매월 1일 오전 9시
             githubActivityAlerts: '0 17 * * 5' // 매주 금요일 오후 5시
@@ -75,53 +74,43 @@ class ScheduleService {
         try {
             const services = config.services || {};
             
-            // 주간 업무 배정
+            // 주간 당직 배정
             if (config.enableWeeklyDutyAssignment !== false) {
                 this.scheduleJob('weeklyDutyAssignment', 
                     config.weeklyDutySchedule || this.defaultSchedules.weeklyDutyAssignment,
                     async () => {
                         if (services.dutyService) {
-                            await services.dutyService.assignWeeklyDuty();
+                            await services.dutyService.assignWeeklyDutySchedule();
                         }
                     }
                 );
             }
 
-            // 업무 리마인더
+            // 당직 리마인더
             if (config.enableDutyReminders !== false) {
                 this.scheduleJob('dutyReminders',
                     config.dutyRemindersSchedule || this.defaultSchedules.dutyReminders,
                     async () => {
                         if (services.dutyService) {
-                            await services.dutyService.sendDutyReminders();
+                            await services.dutyService.sendDutyReminderMessage();
                         }
                     }
                 );
             }
 
-            // 코드 리뷰 페어링
+            // 코드 리뷰 짝꼭 배정
             if (config.enableCodeReviewPairs !== false) {
                 this.scheduleJob('codeReviewPairs',
                     config.codeReviewPairsSchedule || this.defaultSchedules.codeReviewPairs,
                     async () => {
-                        if (services.reviewService) {
-                            await services.reviewService.assignReviewPairs();
+                        if (services.teamService) {
+                            await services.teamService.assignCodeReviewPairsAndSendMessage();
                         }
                     }
                 );
             }
 
-            // 노트북 업무 알림
-            if (config.enableLaptopDutyNotifications !== false) {
-                this.scheduleJob('laptopDutyNotifications',
-                    config.laptopDutySchedule || this.defaultSchedules.laptopDutyNotifications,
-                    async () => {
-                        if (services.laptopService) {
-                            await services.laptopService.sendLaptopDutyNotifications();
-                        }
-                    }
-                );
-            }
+            // 노트북 지참 알림 기능 제거됨 (주간 당직으로 통합)
 
             // GitHub 주간 리포트
             if (config.enableGithubWeeklyReport && services.githubService) {
@@ -178,8 +167,24 @@ class ScheduleService {
             // 모든 기존 작업 정리
             this.clearAllScheduledJobs();
             
-            // 새로운 스케줄 설정
-            this.setupDefaultSchedules(config);
+            // 실제 서비스들 import
+            const dutyService = require('./duty-service');
+            const teamService = require('./team-service');
+            const messageService = require('./message-service');
+            
+            // 서비스 객체 준비
+            const services = {
+                dutyService,
+                teamService,
+                messageService,
+                ...(config.services || {})
+            };
+            
+            // 기본 스케줄 설정
+            this.setupDefaultSchedules({
+                ...config,
+                services
+            });
             
             logger.info('All schedules have been reset and reconfigured');
             return { success: true, jobCount: this.scheduledJobs.size };

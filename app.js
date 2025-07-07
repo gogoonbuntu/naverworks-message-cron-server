@@ -31,7 +31,6 @@ function startApplication() {
         logger.info("- Weekly duty assignment: Monday 8 AM → Channel");
         logger.info("- Duty reminders: Every day 2 PM & 4 PM → Channel");
         logger.info("- Code review pairs: Monday 9 AM → Channel");
-        logger.info("- Laptop duty notifications: Every day 9 AM → Individual");
         logger.info("Press Ctrl+C to stop the server.");
     });
     
@@ -131,7 +130,6 @@ function displayApplicationInfo() {
     logger.info('   - Weekly duty assignment');
     logger.info('   - Daily duty reminders');
     logger.info('   - Code review pair assignment');
-    logger.info('   - Laptop duty notifications');
     logger.info('   - GitHub activity reports (optional)');
     logger.info('');
 }

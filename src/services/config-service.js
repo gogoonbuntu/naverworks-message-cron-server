@@ -95,8 +95,7 @@ class ConfigService {
                     dutyRemindersSchedule: "0 14,16 * * *", // 매일 오후 2시, 4시
                     enableCodeReviewPairs: true,
                     codeReviewPairsSchedule: "0 9 * * 1", // 매주 월요일 오전 9시
-                    enableLaptopDutyNotifications: true,
-                    laptopDutySchedule: "0 9 * * *", // 매일 오전 9시
+                    // 노트북 당직 스케줄 제거됨 (주간 당직으로 통합)
                     enableGithubWeeklyReport: false,
                     githubWeeklySchedule: "0 9 * * 1",
                     enableGithubMonthlyReport: false,
@@ -147,13 +146,7 @@ class ConfigService {
                     notificationChannels: ["naverworks"]
                 },
 
-                // 노트북 관리 설정
-                laptopManagement: {
-                    enabled: true,
-                    notificationTime: "09:00",
-                    notificationChannels: ["naverworks"],
-                    individualNotifications: true
-                },
+                // 노트북 관리 설정 제거됨 (주간 당직으로 통합)
 
                 // GitHub 설정 (선택사항)
                 github: {
@@ -444,6 +437,71 @@ class ConfigService {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * 팀원 정보 업데이트
+     */
+    updateTeamMembers(teamMembers) {
+        try {
+            if (!this.config) {
+                this.loadConfig();
+            }
+            
+            this.config.teamMembers = teamMembers;
+            return this.saveConfig();
+        } catch (error) {
+            logger.error(`Failed to update team members: ${error.message}`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 일간 당직 스케줄 업데이트
+     */
+    updateDailyDutySchedule(dateKey, members) {
+        try {
+            if (!this.config) {
+                this.loadConfig();
+            }
+            
+            if (!this.config.dailyDutySchedule) {
+                this.config.dailyDutySchedule = {};
+            }
+            
+            this.config.dailyDutySchedule[dateKey] = {
+                members: members,
+                updatedAt: new Date().toISOString()
+            };
+            
+            return this.saveConfig();
+        } catch (error) {
+            logger.error(`Failed to update daily duty schedule: ${error.message}`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 코드 리뷰 짝꼭 업데이트
+     */
+    updateCodeReviewPairs(codeReviewPairs) {
+        try {
+            if (!this.config) {
+                this.loadConfig();
+            }
+            
+            this.config.codeReviewPairs = codeReviewPairs;
+            return this.saveConfig();
+        } catch (error) {
+            logger.error(`Failed to update code review pairs: ${error.message}`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 노트북 당직 관련 메서드 제거됨
 }
 
+// ConfigService 인스턴스를 생성하여 export
 module.exports = ConfigService;
+
+// 전역에서 사용할 수 있도록 인스턴스도 export
+module.exports.instance = new ConfigService();

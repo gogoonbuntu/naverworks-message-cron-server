@@ -1,5 +1,5 @@
 // src/services/team-service.js
-// 팀원 관리 서비스 (노트북 당직 기능 제거, 주간 당직으로 통합)
+// 팀원 관리 서비스
 
 const logger = require('../../logger');
 const ConfigService = require('./config-service');
@@ -91,6 +91,150 @@ async function assignCodeReviewPairsAndSendMessage() {
 }
 
 /**
+ * 노트북 지참 알림 배정 및 전송 (기존 기능 유지 - 개별 발송)
+ */
+async function assignLaptopDutyAndSendMessage() {
+    try {
+        const config = configService.loadConfig();
+        let teamMembers = config.teamMembers;
+
+        const todayKST = getCurrentKSTDate().getDay();
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        logger.info(`Starting laptop duty assignment for ${dayNames[todayKST]} (day ${todayKST})`);
+        logger.debug(`Current team members: ${teamMembers.map(m => `${m.name}(${m.id})`).join(', ')}`);
+        
+        let selectedPair = [];
+        let message = "⚠️ 노트북 지참 알림 ⚠️\n\n오늘 노트북 지참 당번은 다음과 같습니다:\n";
+
+        if (todayKST === 5) { // 금요일
+            logger.info('Processing Friday laptop duty assignment (weekend included)');
+            const result = assignLaptopDutyPair(teamMembers, 'friday');
+            selectedPair = result.selectedPair;
+            message += result.message;
+            
+            // 금요일 당직자를 주말용으로 저장
+            configService.updateCurrentLaptopDutyPair(selectedPair);
+            configService.updateTeamMembers(teamMembers);
+            
+            logger.info(`Friday assignment saved for weekend: ${selectedPair.join(' + ')}`);
+
+        } else if (todayKST === 6 || todayKST === 0) { // 토요일 또는 일요일
+            logger.info('Processing weekend laptop duty (using Friday assignment)');
+            
+            // 저장된 금요일 당직자 사용
+            const savedPair = config.currentLaptopDutyPair;
+            if (savedPair && savedPair.length >= 1) {
+                selectedPair = savedPair;
+                
+                // 팀원 정보로 메시지 생성
+                const memberNames = selectedPair.map(memberId => {
+                    const member = teamMembers.find(m => m.id === memberId);
+                    return member ? `${member.name} (${memberId})` : memberId;
+                });
+                
+                message += memberNames.map(name => `- ${name}`).join('\n') + '\n';
+                
+                logger.info(`Weekend assignment: ${selectedPair.join(' + ')} (from Friday)`);
+            } else {
+                message = "⚠️ 노트북 지참 알림 ⚠️\n\n금요일 당번 정보가 없어 당번을 배정할 수 없습니다.\n\n" +
+                         "금요일에 당직자가 배정되면 토요일과 일요일에 동일한 당직자가 자동으로 배정됩니다.";
+                selectedPair = [];
+                logger.warn('No Friday assignment data available for weekend');
+            }
+            
+            // 주말에는 별도로 당직 횟수를 증가시키지 않음 (금요일에만 증가)
+
+        } else if (todayKST === 6 || todayKST === 0) { // 토요일 또는 일요일
+            logger.info('Processing weekend laptop duty (using Friday assignment)');
+            
+            // 저장된 금요일 당직자 사용
+            const savedPair = config.currentLaptopDutyPair;
+            if (savedPair && savedPair.length >= 1) {
+                selectedPair = savedPair;
+                
+                // 팀원 정보로 메시지 생성
+                const memberNames = selectedPair.map(memberId => {
+                    const member = teamMembers.find(m => m.id === memberId);
+                    return member ? `${member.name} (${memberId})` : memberId;
+                });
+                
+                message += memberNames.map(name => `- ${name}`).join('\n') + '\n';
+                
+                logger.info(`Weekend assignment: ${selectedPair.join(' + ')} (from Friday)`);
+            } else {
+                message = "⚠️ 노트북 지참 알림 ⚠️\n\n금요일 당번 정보가 없어 당번을 배정할 수 없습니다.\n\n" +
+                         "금요일에 당직자가 배정되면 토요일과 일요일에 동일한 당직자가 자동으로 배정됩니다.";
+                selectedPair = [];
+                logger.warn('No Friday assignment data available for weekend');
+            }
+            
+            // 주말에는 별도로 당직 횟수를 증가시키지 않음 (금요일에만 증가)
+        } else { // 월~목요일
+            logger.info('Processing weekday laptop duty assignment');
+            const result = assignLaptopDutyPair(teamMembers, 'weekday');
+            selectedPair = result.selectedPair;
+            message += result.message;
+            
+            configService.updateCurrentLaptopDutyPair([]);
+            configService.updateTeamMembers(teamMembers);
+        }
+
+        if (selectedPair.length > 0 || message.includes("부족")) {
+            const recipients = teamMembers.map(m => m.id).join(',');
+            logger.info(`Sending laptop duty notification to all team members: ${recipients}`);
+            await messageService.sendMessagesToMultipleRecipients(message, recipients);
+            logger.info('Laptop duty notification sent successfully');
+        }
+    } catch (error) {
+        logger.error(`Error in laptop duty assignment: ${error.message}`, error);
+    }
+}
+
+/**
+ * 노트북 당직 짝 배정 로직
+ * @param {Array} teamMembers - 팀원 배열
+ * @param {string} type - 배정 타입 ('friday', 'weekday')
+ * @returns {Object} - 배정 결과 객체
+ */
+function assignLaptopDutyPair(teamMembers, type) {
+    // 권한이 있는 팀원들만 필터링
+    const authorizedMembers = teamMembers.filter(member => member.isAuthorized);
+    authorizedMembers.sort((a, b) => (a.laptopDutyCount || 0) - (b.laptopDutyCount || 0));
+    const selectedAuthorized = authorizedMembers.length > 0 ? authorizedMembers[0] : null;
+
+    // 두 번째 사람은 첫 번째와 다른 권한자 선택
+    let selectedOther = null;
+    if (authorizedMembers.length > 1) {
+        selectedOther = authorizedMembers[1];
+    }
+
+    let selectedPair = [];
+    let message = "";
+
+    if (selectedAuthorized && selectedOther) {
+        selectedPair = [selectedAuthorized.id, selectedOther.id];
+        teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount = (teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount || 0) + 1;
+        teamMembers.find(m => m.id === selectedOther.id).laptopDutyCount = (teamMembers.find(m => m.id === selectedOther.id).laptopDutyCount || 0) + 1;
+        message += `- ${teamMembers.find(m => m.id === selectedAuthorized.id).name} (${selectedAuthorized.id})\n`;
+        message += `- ${teamMembers.find(m => m.id === selectedOther.id).name} (${selectedOther.id})\n`;
+        logger.info(`${type} assignment: ${selectedAuthorized.id} (authorized) + ${selectedOther.id} (authorized)`);
+    } else if (authorizedMembers.length >= 1) {
+        // 권한자가 1명만 있는 경우
+        selectedPair = [selectedAuthorized.id];
+        teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount = (teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount || 0) + 1;
+        message += `- ${teamMembers.find(m => m.id === selectedAuthorized.id).name} (${selectedAuthorized.id})\n`;
+        logger.info(`${type} assignment: ${selectedAuthorized.id} (authorized only)`);
+    } else {
+        message = "⚠️ 노트북 지참 알림 ⚠️\n\n권한 팀원이 부족하여 노트북 당번을 배정할 수 없습니다.";
+        selectedPair = [];
+        logger.warn(`Insufficient authorized team members for ${type} laptop duty assignment`);
+    }
+
+    return { selectedPair, message };
+}
+
+/**
  * 팀원 통계 정보 조회
  * @returns {Object} - 팀원 통계 정보
  */
@@ -104,7 +248,7 @@ function getTeamMemberStats() {
             dutyStats: config.teamMembers.map(m => ({
                 id: m.id,
                 name: m.name,
-                weeklyDutyCount: m.weeklyDutyCount || 0,
+                laptopDutyCount: m.laptopDutyCount || 0,
                 codeReviewCount: m.codeReviewCount || 0
             }))
         };
@@ -123,7 +267,7 @@ function resetTeamMemberCounts() {
     try {
         const config = configService.loadConfig();
         config.teamMembers.forEach(member => {
-            member.weeklyDutyCount = 0;
+            member.laptopDutyCount = 0;
             member.codeReviewCount = 0;
         });
         
@@ -217,6 +361,8 @@ function generateCodeReviewPreview() {
 
 module.exports = {
     assignCodeReviewPairsAndSendMessage,
+    assignLaptopDutyAndSendMessage,
+    assignLaptopDutyPair,
     getTeamMemberStats,
     resetTeamMemberCounts,
     generateCodeReviewPreview

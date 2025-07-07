@@ -2,7 +2,8 @@
 // 당직 관리 서비스
 
 const logger = require('../../logger');
-const configService = require('./config-service');
+const ConfigService = require('./config-service');
+const configService = new ConfigService();
 const messageService = require('./message-service');
 const { getCurrentKSTDate, formatDateToKey, getWeekDates, DAY_NAMES, getWeekKey } = require('../utils/date-utils');
 
@@ -182,11 +183,11 @@ async function assignDailyDuty(date, dutyMembers) {
         // 일간 당직 저장
         configService.updateDailyDutySchedule(dateKey, dutyMembers);
         
-        // 각 팀원의 당직 횟수 업데이트
+        // 각 팀원의 주간 당직 횟수 업데이트
         dutyMembers.forEach(memberId => {
             const member = config.teamMembers.find(m => m.id === memberId);
             if (member) {
-                member.dailyDutyCount = (member.dailyDutyCount || 0) + 1;
+                member.weeklyDutyCount = (member.weeklyDutyCount || 0) + 1;
             }
         });
         
@@ -212,51 +213,62 @@ async function assignWeeklyDutySchedule() {
         
         logger.info(`Assigning weekly duty schedule for ${weekDates[0]} to ${weekDates[6]}`);
         
-        // 팀원들을 당직 횟수 기준으로 정렬
-        const availableMembers = [...config.teamMembers];
-        availableMembers.sort((a, b) => (a.dailyDutyCount || 0) - (b.dailyDutyCount || 0));
-        
-        if (availableMembers.length < 2) {
-            logger.warn('Not enough team members for duty assignment');
-            return { success: false, message: '당직 편성을 위한 팀원이 부족합니다.' };
+        // 권한이 있는 팀원들만 필터링하고 주간 당직 횟수 기준으로 정렬
+        const authorizedMembers = config.teamMembers.filter(m => m.isAuthorized);
+        if (authorizedMembers.length < 2) {
+            logger.warn('Not enough authorized team members for duty assignment');
+            return { success: false, message: '당직 편성을 위한 권한 팀원이 부족합니다.' };
         }
         
-        // 각 날짜에 대해 당직자 배정
-        let memberIndex = 0;
+        // 주간 당직 횟수 기준으로 정렬 (적은 순서대로)
+        authorizedMembers.sort((a, b) => (a.weeklyDutyCount || 0) - (b.weeklyDutyCount || 0));
+        
+        logger.info(`Authorized members sorted by weekly duty count: ${authorizedMembers.map(m => `${m.name}(${m.weeklyDutyCount || 0})`).join(', ')}`);
+        
+        // 각 날짜에 대해 당직자 배정 (2명씩)
         const assignments = [];
+        let memberIndex = 0;
         
         for (const dateKey of weekDates) {
             const dutyMembers = [];
             
-            // 권한자 1명 + 일반 팀원 1명 구성
-            const authorizedMembers = availableMembers.filter(m => m.isAuthorized);
-            const regularMembers = availableMembers.filter(m => !m.isAuthorized);
+            // 첫 번째 당직자 선택
+            dutyMembers.push(authorizedMembers[memberIndex % authorizedMembers.length].id);
             
-            if (authorizedMembers.length > 0) {
-                dutyMembers.push(authorizedMembers[memberIndex % authorizedMembers.length].id);
-            }
-            
-            if (regularMembers.length > 0) {
-                dutyMembers.push(regularMembers[memberIndex % regularMembers.length].id);
-            } else if (availableMembers.length > 1) {
-                dutyMembers.push(availableMembers[(memberIndex + 1) % availableMembers.length].id);
-            }
-            
-            // 1명만 있는 경우 해당 팀원 배정
-            if (dutyMembers.length === 0 && availableMembers.length > 0) {
-                dutyMembers.push(availableMembers[0].id);
-            }
+            // 두 번째 당직자 선택 (첫 번째와 다른 사람)
+            const secondMemberIndex = (memberIndex + 1) % authorizedMembers.length;
+            dutyMembers.push(authorizedMembers[secondMemberIndex].id);
             
             assignments.push({ date: dateKey, members: dutyMembers });
             memberIndex++;
         }
+        
+        // 배정된 당직자들의 주간 당직 횟수 업데이트
+        const memberDutyCount = {};
+        assignments.forEach(assignment => {
+            assignment.members.forEach(memberId => {
+                memberDutyCount[memberId] = (memberDutyCount[memberId] || 0) + 1;
+            });
+        });
+        
+        // 팀원들의 주간 당직 횟수 업데이트
+        config.teamMembers.forEach(member => {
+            if (memberDutyCount[member.id]) {
+                // 주간 당직 횟수는 assignDailyDuty에서 이미 업데이트됨
+            // member.weeklyDutyCount = (member.weeklyDutyCount || 0) + memberDutyCount[member.id];
+            }
+        });
         
         // 모든 일간 당직 저장
         for (const assignment of assignments) {
             await assignDailyDuty(assignment.date, assignment.members);
         }
         
+        // 팀원 정보 업데이트 저장
+        configService.updateTeamMembers(config.teamMembers);
+        
         logger.info('Weekly duty schedule assigned successfully');
+        logger.info(`Updated weekly duty counts: ${config.teamMembers.filter(m => m.isAuthorized).map(m => `${m.name}(${m.weeklyDutyCount || 0})`).join(', ')}`);
         
         // 채널로 알림 발송
         const weeklyMessage = generateWeeklyDutyMessage(assignments, config);
@@ -342,11 +354,74 @@ async function sendDutyReminderMessage() {
     }
 }
 
+/**
+ * 주간 당직 편성 미리보기 생성
+ * @returns {Object} - 미리보기 데이터
+ */
+function generateWeeklyDutyPreview() {
+    try {
+        const config = configService.loadConfig();
+        const weekDates = getWeekDates();
+        
+        logger.info(`Generating weekly duty preview for ${weekDates[0]} to ${weekDates[6]}`);
+        
+        // 권한이 있는 팀원들만 필터링하고 주간 당직 횟수 기준으로 정렬
+        const authorizedMembers = config.teamMembers.filter(m => m.isAuthorized);
+        authorizedMembers.sort((a, b) => (a.weeklyDutyCount || 0) - (b.weeklyDutyCount || 0));
+        
+        // 각 날짜에 대해 당직자 배정 시뮬레이션 (2명씩)
+        const assignments = [];
+        let memberIndex = 0;
+        
+        for (const dateKey of weekDates) {
+            const dutyMembers = [];
+            
+            // 첫 번째 당직자 선택
+            dutyMembers.push(authorizedMembers[memberIndex % authorizedMembers.length].id);
+            
+            // 두 번째 당직자 선택 (첫 번째와 다른 사람)
+            const secondMemberIndex = (memberIndex + 1) % authorizedMembers.length;
+            dutyMembers.push(authorizedMembers[secondMemberIndex].id);
+            
+            assignments.push({ date: dateKey, members: dutyMembers });
+            memberIndex++;
+        }
+        
+        // 미리보기 메시지 생성
+        const previewMessage = generateWeeklyDutyMessage(assignments, config);
+        
+        return {
+            success: true,
+            message: previewMessage,
+            weekRange: `${weekDates[0]} ~ ${weekDates[6]}`,
+            assignments: assignments.map(assignment => ({
+                date: assignment.date,
+                members: assignment.members.map(memberId => {
+                    const member = config.teamMembers.find(m => m.id === memberId);
+                    return {
+                        id: memberId,
+                        name: member ? member.name : memberId,
+                        currentCount: member ? (member.weeklyDutyCount || 0) : 0
+                    };
+                })
+            }))
+        };
+        
+    } catch (error) {
+        logger.error(`Error generating weekly duty preview: ${error.message}`, error);
+        return {
+            success: false,
+            message: '주간 당직 편성 미리보기 생성 중 오류가 발생했습니다.'
+        };
+    }
+}
+
 module.exports = {
     getWeeklyDutySchedule,
     getTodayDutyMembers,
     assignDailyDuty,
     assignWeeklyDutySchedule,
     generateWeeklyDutyMessage,
-    sendDutyReminderMessage
+    sendDutyReminderMessage,
+    generateWeeklyDutyPreview
 };

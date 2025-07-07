@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버웍스 자동 알림 스케줄러</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #333;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 1000px;
+            box-sizing: border-box;
+            border: 1px solid #e0e0e0;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        /* 미리보기 모달 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .modal-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+        }
+        .preview-content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .preview-info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .preview-info h4 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        .preview-info p {
+            margin: 5px 0;
+            color: #424242;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .btn-confirm {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+        .btn-confirm:hover {
+            background-color: #218838;
+        }
+        .btn-confirm:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+        .btn-cancel:hover {
+            background-color: #545b62;
+        }
+        .btn-preview {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+        .btn-preview:hover {
+            background-color: #138496;
+        }
+        .btn-preview:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        /* 기본 스타일들 */
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 30px;
+        }
+        .tab-nav button {
+            background-color: transparent;
+            border: none;
+            padding: 15px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            color: #666;
+            font-weight: 500;
+        }
+        .tab-nav button:hover {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .tab-nav button.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fcfcfc;
+        }
+        .current-status {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .current-status h3 {
+            margin: 0 0 10px 0;
+            color: white;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stat-card h4 {
+            margin: 0 0 5px 0;
+            color: #007bff;
+            font-size: 0.9em;
+        }
+        .stat-card p {
+            margin: 0;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .quick-actions button {
+            margin-top: 0;
+        }
+        .secondary-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .secondary-btn:hover {
+            background-color: #545b62;
+        }
+        .status-message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            background-color: #e9ecef;
+            color: #333;
+            border: 1px solid #dee2e6;
+        }
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        .status-message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+        
+        /* 주간 편성표 스타일 */
+        .weekly-schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .duty-day {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s ease;
+        }
+        .duty-day:hover {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .duty-day.today {
+            border-color: #007bff;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+        }
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+        }
+        .today-badge {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .duty-members {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .duty-day.today .duty-members {
+            color: #0056b3;
+            font-weight: 500;
+        }
+        
+        /* 오늘의 당직자 스타일 */
+        .today-duty-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .today-duty-card.no-duty {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            color: #333;
+        }
+        .duty-info h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.3em;
+            color: white;
+        }
+        .today-duty-card.no-duty .duty-info h3 {
+            color: #333;
+        }
+        .duty-members-large {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .duty-date {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        /* 코드리뷰 짝꿍 스타일 */
+        .review-pair-item {
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+            border-left: 5px solid #6f42c1;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .review-pair-item p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .review-pair-item strong {
+            color: #6f42c1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>네이버웍스 자동 알림 스케줄러</h1>
+        
+        <!-- 탭 네비게이션 -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="status">코드리뷰 짝꿍 & 당직 현황</button>
+            <button class="tab-btn" data-tab="team">팀원 및 당직 관리</button>
+            <button class="tab-btn" data-tab="schedule">크론메시지 관리</button>
+        </div>
+
+        <!-- 탭 1: 코드리뷰 짝꿍 & 당직 현황 -->
+        <div id="status-tab" class="tab-content active">
+            <div class="current-status">
+                <h3>🚀 자동 스케줄 시스템 가동 중</h3>
+                <p>주간 당직: 매주 월요일 8시 | 당직 알림: 매일 2시, 4시 | 코드리뷰: 매주 월요일 9시</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>등록된 팀원</h4>
+                    <p id="totalMembers">0명</p>
+                </div>
+                <div class="stat-card">
+                    <h4>권한자</h4>
+                    <p id="authorizedMembers">0명</p>
+                </div>
+                <div class="stat-card">
+                    <h4>활성 스케줄</h4>
+                    <p id="activeSchedules">0개</p>
+                </div>
+                <div class="stat-card">
+                    <h4>이번 주</h4>
+                    <p id="currentWeek">-</p>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <button id="previewWeeklyDuty" class="btn-preview">주간 당직 편성 미리보기</button>
+                <button id="previewCodeReview" class="btn-preview">코드리뷰 짝꿍 편성 미리보기</button>
+                <button id="refreshStatus" class="secondary-btn">현황 새로고침</button>
+            </div>
+
+            <div class="section">
+                <h2>📅 이번주 당직 편성표</h2>
+                <div id="weeklyDutySchedule">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🚨 오늘의 당직자</h2>
+                <div id="todayDutyStatus">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>👥 현재 코드리뷰 짝꿍</h2>
+                <div id="currentCodeReviewPairs">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+
+            <div id="statusMessage" class="status-message" style="display: none;"></div>
+        </div>
+
+        <!-- 탭 2: 팀원 및 당직 관리 -->
+        <div id="team-tab" class="tab-content">
+            <div class="section">
+                <h2>팀원 관리</h2>
+                <div class="form-group">
+                    <label for="teamMemberIdInput">팀원 ID:</label>
+                    <input type="text" id="teamMemberIdInput" placeholder="예: tmddud333">
+                </div>
+                <div class="form-group">
+                    <label for="teamMemberNameInput">팀원 이름:</label>
+                    <input type="text" id="teamMemberNameInput" placeholder="예: 홍길동">
+                </div>
+                <div class="flex-group">
+                    <input type="checkbox" id="isAuthorizedCheckbox">
+                    <label for="isAuthorizedCheckbox">권한 있는 팀원 (당직 필수 포함)</label>
+                </div>
+                <button id="addTeamMemberButton">팀원 추가</button>
+                <div id="teamMemberStatusMessage" class="status-message" style="display: none;"></div>
+                
+                <h3>등록된 팀원</h3>
+                <div id="teamMemberList">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 탭 3: 크론메시지 관리 -->
+        <div id="schedule-tab" class="tab-content">
+            <div class="section">
+                <h2>새 스케줄 추가 / 편집</h2>
+                <div class="form-group">
+                    <label for="scheduleTypeSelect">스케줄 타입:</label>
+                    <select id="scheduleTypeSelect">
+                        <option value="message">일반 메시지 알림</option>
+                        <option value="laptop_duty">노트북 지참 알림</option>
+                        <option value="code_review">코드 리뷰 짝꿍 알림</option>
+                    </select>
+                </div>
+                <div class="form-group" id="messageGroup">
+                    <label for="messageInput">메시지 내용:</label>
+                    <textarea id="messageInput" placeholder="여기에 보낼 메시지를 입력하세요..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="cronScheduleInput">스케줄 (Cron 형식):</label>
+                    <input type="text" id="cronScheduleInput" placeholder="예: 0 0 9 * * MON (매주 월요일 오전 9시)">
+                </div>
+                <button id="saveScheduleButton">스케줄 저장</button>
+                <div id="scheduleStatusMessage" class="status-message" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 주간 당직 편성 미리보기 모달 -->
+    <div id="weeklyDutyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">주간 당직 편성 미리보기</h2>
+                <span class="close" data-modal="weeklyDutyModal">&times;</span>
+            </div>
+            <div class="preview-info">
+                <h4>📋 편성 정보</h4>
+                <p id="weeklyDutyInfo">로딩 중...</p>
+            </div>
+            <div class="preview-content" id="weeklyDutyPreview">
+                로딩 중...
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" data-modal="weeklyDutyModal">취소</button>
+                <button class="btn-confirm" id="confirmWeeklyDuty">편성 실행 및 알림 전송</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 코드리뷰 짝꿍 편성 미리보기 모달 -->
+    <div id="codeReviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">코드리뷰 짝꿍 편성 미리보기</h2>
+                <span class="close" data-modal="codeReviewModal">&times;</span>
+            </div>
+            <div class="preview-info">
+                <h4>👥 편성 정보</h4>
+                <p id="codeReviewInfo">로딩 중...</p>
+            </div>
+            <div class="preview-content" id="codeReviewPreview">
+                로딩 중...
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" data-modal="codeReviewModal">취소</button>
+                <button class="btn-confirm" id="confirmCodeReview">편성 실행 및 알림 전송</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 요소들
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // 상태 탭 요소들
+        const totalMembersSpan = document.getElementById('totalMembers');
+        const authorizedMembersSpan = document.getElementById('authorizedMembers');
+        const activeSchedulesSpan = document.getElementById('activeSchedules');
+        const currentWeekSpan = document.getElementById('currentWeek');
+        const weeklyDutyScheduleDiv = document.getElementById('weeklyDutySchedule');
+        const todayDutyStatusDiv = document.getElementById('todayDutyStatus');
+        const currentCodeReviewPairsDiv = document.getElementById('currentCodeReviewPairs');
+        const statusMessageDiv = document.getElementById('statusMessage');
+        const previewWeeklyDutyBtn = document.getElementById('previewWeeklyDuty');
+        const previewCodeReviewBtn = document.getElementById('previewCodeReview');
+        const refreshStatusBtn = document.getElementById('refreshStatus');
+
+        // 모달 관련 요소들
+        const weeklyDutyModal = document.getElementById('weeklyDutyModal');
+        const codeReviewModal = document.getElementById('codeReviewModal');
+        const weeklyDutyPreview = document.getElementById('weeklyDutyPreview');
+        const codeReviewPreview = document.getElementById('codeReviewPreview');
+        const weeklyDutyInfo = document.getElementById('weeklyDutyInfo');
+        const codeReviewInfo = document.getElementById('codeReviewInfo');
+        const confirmWeeklyDutyBtn = document.getElementById('confirmWeeklyDuty');
+        const confirmCodeReviewBtn = document.getElementById('confirmCodeReview');
+
+        let currentConfig = { 
+            schedules: [], 
+            teamMembers: [], 
+            currentLaptopDutyPair: [],
+            dailyDutySchedule: {},
+            codeReviewPairs: []
+        };
+
+        // 탭 네비게이션 이벤트
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                tabContents.forEach(content => content.classList.remove('active'));
+                document.getElementById(`${targetTab}-tab`).classList.add('active');
+                
+                if (targetTab === 'status') {
+                    updateStatusTab();
+                }
+            });
+        });
+
+        // 모달 관련 이벤트
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', () => {
+                const modalId = closeBtn.dataset.modal;
+                document.getElementById(modalId).style.display = 'none';
+            });
+        });
+
+        document.querySelectorAll('.btn-cancel').forEach(cancelBtn => {
+            cancelBtn.addEventListener('click', () => {
+                const modalId = cancelBtn.dataset.modal;
+                document.getElementById(modalId).style.display = 'none';
+            });
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+
+        function showStatus(messageDiv, message, type = 'info') {
+            messageDiv.textContent = message;
+            messageDiv.className = `status-message ${type}`;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function getWeekKey(date = new Date()) {
+            const kstDate = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+            const year = kstDate.getFullYear();
+            const week = getWeekNumber(kstDate);
+            return `${year}-W${week.toString().padStart(2, '0')}`;
+        }
+
+        function getWeekNumber(date) {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+            return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        }
+
+        // 상태 탭 업데이트
+        async function updateStatusTab() {
+            const totalMembers = currentConfig.teamMembers.length;
+            const authorizedCount = currentConfig.teamMembers.filter(m => m.isAuthorized).length;
+            const activeScheduleCount = currentConfig.schedules.length + 4;
+            const weekKey = getWeekKey();
+
+            totalMembersSpan.textContent = `${totalMembers}명`;
+            authorizedMembersSpan.textContent = `${authorizedCount}명`;
+            activeSchedulesSpan.textContent = `${activeScheduleCount}개`;
+            currentWeekSpan.textContent = weekKey;
+
+            await loadWeeklyDutySchedule();
+            await loadTodayDutyStatus();
+            
+            const codeReviewPairs = currentConfig.codeReviewPairs || [];
+            if (codeReviewPairs.length > 0) {
+                let pairsHtml = '';
+                codeReviewPairs.forEach(pair => {
+                    const memberNames = pair.members.map(member => `${member.name}(${member.id})`).join(' & ');
+                    pairsHtml += `
+                        <div class="review-pair-item">
+                            <p><strong>짝꿍 ${pair.pairNumber}:</strong> ${memberNames}</p>
+                            <p><strong>편성 주:</strong> ${pair.weekKey}</p>
+                        </div>
+                    `;
+                });
+                currentCodeReviewPairsDiv.innerHTML = pairsHtml;
+            } else {
+                currentCodeReviewPairsDiv.innerHTML = `
+                    <div class="review-pair-item">
+                        <p>이번 주 코드리뷰 짝꿍이 아직 편성되지 않았습니다.</p>
+                        <p>매주 월요일 오전 9시에 자동으로 편성되거나, 수동으로 편성할 수 있습니다.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 주간 당직 편성 미리보기
+        previewWeeklyDutyBtn.addEventListener('click', async () => {
+            try {
+                previewWeeklyDutyBtn.disabled = true;
+                previewWeeklyDutyBtn.textContent = '미리보기 생성 중...';
+                
+                const response = await fetch('/preview-weekly-duty', { method: 'POST' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 편성 정보 표시
+                        weeklyDutyInfo.innerHTML = `
+                            <p><strong>편성 대상:</strong> 권한 있는 팀원 ${data.authorizedCount}명</p>
+                            <p><strong>편성 기간:</strong> ${data.weekRange}</p>
+                            <p><strong>편성 방식:</strong> 당직 횟수 기준 순환 배정</p>
+                        `;
+                        
+                        // 미리보기 메시지 표시
+                        weeklyDutyPreview.textContent = data.previewMessage;
+                        
+                        // 모달 표시
+                        weeklyDutyModal.style.display = 'block';
+                    } else {
+                        showStatus(statusMessageDiv, data.message, 'error');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    showStatus(statusMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(statusMessageDiv, '주간 당직 편성 미리보기 생성 중 오류가 발생했습니다.', 'error');
+            } finally {
+                previewWeeklyDutyBtn.disabled = false;
+                previewWeeklyDutyBtn.textContent = '주간 당직 편성 미리보기';
+            }
+        });
+
+        // 코드리뷰 짝꿍 편성 미리보기
+        previewCodeReviewBtn.addEventListener('click', async () => {
+            try {
+                previewCodeReviewBtn.disabled = true;
+                previewCodeReviewBtn.textContent = '미리보기 생성 중...';
+                
+                const response = await fetch('/preview-code-review', { method: 'POST' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 편성 정보 표시
+                        codeReviewInfo.innerHTML = `
+                            <p><strong>편성 대상:</strong> 전체 팀원 ${data.totalMembers}명</p>
+                            <p><strong>편성 주:</strong> ${data.weekKey}</p>
+                            <p><strong>편성 방식:</strong> 코드리뷰 횟수 기준 순환 배정</p>
+                        `;
+                        
+                        // 미리보기 메시지 표시
+                        codeReviewPreview.textContent = data.previewMessage;
+                        
+                        // 모달 표시
+                        codeReviewModal.style.display = 'block';
+                    } else {
+                        showStatus(statusMessageDiv, data.message, 'error');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    showStatus(statusMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(statusMessageDiv, '코드리뷰 짝꿍 편성 미리보기 생성 중 오류가 발생했습니다.', 'error');
+            } finally {
+                previewCodeReviewBtn.disabled = false;
+                previewCodeReviewBtn.textContent = '코드리뷰 짝꿍 편성 미리보기';
+            }
+        });
+
+        // 주간 당직 편성 확인 및 실행
+        confirmWeeklyDutyBtn.addEventListener('click', async () => {
+            try {
+                confirmWeeklyDutyBtn.disabled = true;
+                confirmWeeklyDutyBtn.textContent = '실행 중...';
+                
+                const response = await fetch('/execute-weekly-duty', { method: 'POST' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(statusMessageDiv, data.message, 'success');
+                    weeklyDutyModal.style.display = 'none';
+                    await loadInitialConfig();
+                    await updateStatusTab();
+                } else {
+                    const errorData = await response.json();
+                    showStatus(statusMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(statusMessageDiv, '주간 당직 편성 실행 중 오류가 발생했습니다.', 'error');
+            } finally {
+                confirmWeeklyDutyBtn.disabled = false;
+                confirmWeeklyDutyBtn.textContent = '편성 실행 및 알림 전송';
+            }
+        });
+
+        // 코드리뷰 짝꿍 편성 확인 및 실행
+        confirmCodeReviewBtn.addEventListener('click', async () => {
+            try {
+                confirmCodeReviewBtn.disabled = true;
+                confirmCodeReviewBtn.textContent = '실행 중...';
+                
+                const response = await fetch('/execute-code-review', { method: 'POST' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(statusMessageDiv, data.message, 'success');
+                    codeReviewModal.style.display = 'none';
+                    await loadInitialConfig();
+                    await updateStatusTab();
+                } else {
+                    const errorData = await response.json();
+                    showStatus(statusMessageDiv, errorData.message, 'error');
+                }
+            } catch (error) {
+                showStatus(statusMessageDiv, '코드리뷰 짝꿍 편성 실행 중 오류가 발생했습니다.', 'error');
+            } finally {
+                confirmCodeReviewBtn.disabled = false;
+                confirmCodeReviewBtn.textContent = '편성 실행 및 알림 전송';
+            }
+        });
+
+        // 기존 함수들
+        async function loadInitialConfig() {
+            try {
+                const response = await fetch('/config');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentConfig = data;
+                    await updateStatusTab();
+                }
+            } catch (error) {
+                console.error('Initial config load error:', error);
+            }
+        }
+
+        async function loadWeeklyDutySchedule() {
+            try {
+                const response = await fetch('/weekly-duty-schedule');
+                if (response.ok) {
+                    const weeklySchedule = await response.json();
+                    displayWeeklyDutySchedule(weeklySchedule);
+                }
+            } catch (error) {
+                console.error('Weekly duty schedule load error:', error);
+            }
+        }
+
+        async function loadTodayDutyStatus() {
+            try {
+                const response = await fetch('/today-duty');
+                if (response.ok) {
+                    const todayDuty = await response.json();
+                    displayTodayDutyStatus(todayDuty);
+                }
+            } catch (error) {
+                console.error('Today duty load error:', error);
+            }
+        }
+
+        function displayWeeklyDutySchedule(weeklySchedule) {
+            if (weeklySchedule.length === 0) {
+                weeklyDutyScheduleDiv.innerHTML = '<p>이번주 당직 편성표가 없습니다.</p>';
+                return;
+            }
+
+            let scheduleHtml = '<div class="weekly-schedule-grid">';
+            weeklySchedule.forEach(day => {
+                const isToday = day.date === new Date().toISOString().split('T')[0];
+                const todayClass = isToday ? 'today' : '';
+                
+                const membersText = day.members.length > 0 
+                    ? day.members.map(m => `${m.name}(${m.id})`).join(' & ')
+                    : '미배정';
+                
+                scheduleHtml += `
+                    <div class="duty-day ${todayClass}">
+                        <div class="day-header">
+                            <strong>${day.dayName}</strong> (${day.displayDate})
+                            ${isToday ? '<span class="today-badge">오늘</span>' : ''}
+                        </div>
+                        <div class="duty-members">
+                            ${membersText}
+                        </div>
+                    </div>
+                `;
+            });
+            scheduleHtml += '</div>';
+            
+            weeklyDutyScheduleDiv.innerHTML = scheduleHtml;
+        }
+
+        function displayTodayDutyStatus(todayDuty) {
+            if (!todayDuty || todayDuty.hasNoDuty || !todayDuty.members || todayDuty.members.length === 0) {
+                const currentDate = todayDuty?.displayDate || new Date().toLocaleDateString('ko-KR');
+                todayDutyStatusDiv.innerHTML = `
+                    <div class="today-duty-card no-duty">
+                        <div class="duty-info">
+                            <h3>📅 오늘(${currentDate})</h3>
+                            <p><strong>당직자가 배정되지 않았습니다.</strong></p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const membersText = todayDuty.members.map(m => `${m.name}(${m.id})`).join(' & ');
+            todayDutyStatusDiv.innerHTML = `
+                <div class="today-duty-card">
+                    <div class="duty-info">
+                        <h3>🚨 오늘의 당직자</h3>
+                        <p class="duty-members-large">${membersText}</p>
+                        <p class="duty-date">날짜: ${todayDuty.displayDate}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        refreshStatusBtn.addEventListener('click', async () => {
+            await loadInitialConfig();
+            await updateStatusTab();
+            showStatus(statusMessageDiv, '현황이 새로고침되었습니다.', 'success');
+        });
+
+        window.addEventListener('load', () => {
+            loadInitialConfig();
+        });
+    </script>
+</body>
+</html>

@@ -251,8 +251,64 @@ function getPreviousWorkday(date = null) {
     return prevDay;
 }
 
+/**
+ * 현재 한국 시간 날짜 반환 (기존 함수와 호환성 유지)
+ */
+function getCurrentKSTDate() {
+    return getKSTDate();
+}
+
+/**
+ * 주차 키 생성 (YYYY-WW 형식)
+ */
+function getWeekKey(date = null) {
+    const kstDate = getKSTDate(date);
+    const year = kstDate.getFullYear();
+    const weekNumber = getWeekNumber(date);
+    
+    return `${year}-${String(weekNumber).padStart(2, '0')}`;
+}
+
+/**
+ * 날짜를 키 형식으로 변환 (YYYY-MM-DD)
+ */
+function formatDateToKey(date) {
+    const d = getKSTDate(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * 이번 주 날짜 배열 반환 (월요일부터 일요일까지)
+ */
+function getWeekDates(date = null) {
+    const weekRange = getWeekRange(date);
+    const dates = [];
+    
+    for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(weekRange.start);
+        currentDate.setDate(weekRange.start.getDate() + i);
+        dates.push(formatDateToKey(currentDate));
+    }
+    
+    return dates;
+}
+
+/**
+ * 요일 이름 배열 (상수)
+ */
+const DAY_NAMES = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+
 module.exports = {
     getKSTDate,
+    getCurrentKSTDate,
+    getWeekKey,
+    formatDateToKey,
+    getWeekDates,
+    DAY_NAMES,
     getWeekRange,
     getLastWeekRange,
     getMonthRange,
