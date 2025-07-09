@@ -1,4 +1,7 @@
-// GitHub 관리 함수들
+// public/js/github-management.js
+// GitHub 관리 함수들 - 백그라운드 작업 지원 버전
+
+// DOM 요소들
 const githubServiceStatusSpan = document.getElementById('githubServiceStatus');
 const githubRepoCountSpan = document.getElementById('githubRepoCount');
 const githubMemberCountSpan = document.getElementById('githubMemberCount');
@@ -44,14 +47,29 @@ const githubToggleHistoryBtn = document.getElementById('githubToggleHistory');
 const githubReportHistorySection = document.getElementById('githubReportHistorySection');
 const githubReportHistoryDiv = document.getElementById('githubReportHistory');
 
-// GitHub 관련 변수들
+// 백그라운드 작업 관련 변수들
+let currentTaskId = null;
 let currentReportData = null;
 let currentReportType = null;
-let isGeneratingReport = false;
-let reportGenerationAborted = false;
-let progressIntervalId = null;
-let currentProgressData = null;
+let taskStatusInterval = null;
+let isTaskRunning = false;
 
+// 초기화 함수
+function initializeGitHubManagement() {
+    // 기존 로딩 함수들 호출
+    loadGitHubStatus();
+    loadStorageStats();
+    
+    // 주기적으로 실행 중인 작업 확인
+    setInterval(checkRunningTasks, 5000); // 5초마다 확인
+}
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', initializeGitHubManagement);
+
+/**
+ * GitHub 상태 로드
+ */
 async function loadGitHubStatus() {
     try {
         const response = await fetch('/github/status');
@@ -74,6 +92,9 @@ async function loadGitHubStatus() {
     }
 }
 
+/**
+ * GitHub 상태 표시 업데이트
+ */
 function updateGitHubStatusDisplay(status) {
     githubServiceStatusSpan.textContent = status.isEnabled ? '활성' : '비활성';
     githubRepoCountSpan.textContent = `${status.config?.repositoryCount || 0}개`;
@@ -87,8 +108,17 @@ function updateGitHubStatusDisplay(status) {
     githubCheckAlertsBtn.disabled = !isEnabled;
     githubGenerateCustomReportBtn.disabled = !isEnabled;
     githubGetMemberStatsBtn.disabled = !isEnabled;
+    
+    // 작업 상태 표시
+    if (status.tasks && status.tasks.running > 0) {
+        githubReportStatusSpan.textContent = `실행 중 (${status.tasks.running}개 작업)`;
+        githubReportStatusSpan.className = 'report-status running';
+    }
 }
 
+/**
+ * GitHub 설정 로드
+ */
 async function loadGitHubConfig() {
     try {
         const response = await fetch('/github/config');
@@ -129,29 +159,159 @@ async function loadGitHubConfig() {
     }
 }
 
-// 진행도 세부사항 업데이트
+/**
+ * 실행 중인 작업 확인
+ */
+async function checkRunningTasks() {
+    try {
+        const response = await fetch('/github/running-tasks');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data.length > 0) {
+                // 실행 중인 작업이 있으면 상태 업데이트
+                const latestTask = result.data[result.data.length - 1];
+                handleRunningTask(latestTask);
+            } else if (isTaskRunning) {
+                // 실행 중이던 작업이 완료됨
+                handleTaskCompleted();
+            }
+        }
+    } catch (error) {
+        console.error('Error checking running tasks:', error);
+    }
+}
+
+/**
+ * 실행 중인 작업 처리
+ */
+function handleRunningTask(task) {
+    if (!isTaskRunning) {
+        isTaskRunning = true;
+        currentTaskId = task.id;
+        
+        // 작업 타입에 따라 UI 업데이트
+        if (task.type === 'github_weekly_report') {
+            setReportGeneratingState(true, 'weekly');
+        } else if (task.type === 'github_monthly_report') {
+            setReportGeneratingState(true, 'monthly');
+        }
+        
+        // 진행도 추적 시작
+        startProgressTracking(task.id);
+    }
+    
+    // 진행도 업데이트
+    updateProgressDetails(task.progress);
+}
+
+/**
+ * 작업 완료 처리
+ */
+function handleTaskCompleted() {
+    if (isTaskRunning) {
+        isTaskRunning = false;
+        currentTaskId = null;
+        
+        setReportGeneratingState(false);
+        stopProgressTracking();
+        
+        // 완료된 작업 결과 확인
+        checkCompletedTaskResult();
+    }
+}
+
+/**
+ * 완료된 작업 결과 확인
+ */
+async function checkCompletedTaskResult() {
+    try {
+        const response = await fetch('/github/task-status');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                // 완료된 작업 중 리포트 생성 작업 찾기
+                const completedReportTasks = result.data.filter(task => 
+                    task.status === 'completed' && 
+                    task.type.includes('github') && 
+                    task.type.includes('report')
+                );
+                
+                if (completedReportTasks.length > 0) {
+                    const latestTask = completedReportTasks[completedReportTasks.length - 1];
+                    handleReportGenerationComplete(latestTask);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking completed task result:', error);
+    }
+}
+
+/**
+ * 진행도 추적 시작
+ */
+function startProgressTracking(taskId) {
+    if (taskStatusInterval) {
+        clearInterval(taskStatusInterval);
+    }
+    
+    taskStatusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/github/task-progress?taskId=${taskId}`);
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    updateProgressDetails(result.data.progress);
+                    
+                    // 작업이 완료되면 추적 중지
+                    if (result.data.status !== 'running') {
+                        stopProgressTracking();
+                        handleTaskCompleted();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error tracking progress:', error);
+        }
+    }, 2000); // 2초마다 진행도 확인
+}
+
+/**
+ * 진행도 추적 중지
+ */
+function stopProgressTracking() {
+    if (taskStatusInterval) {
+        clearInterval(taskStatusInterval);
+        taskStatusInterval = null;
+    }
+}
+
+/**
+ * 진행도 세부사항 업데이트
+ */
 function updateProgressDetails(progressData) {
     if (!progressData) {
         githubProgressDetailsDiv.classList.remove('visible');
         return;
     }
     
-    currentProgressData = progressData;
-    
     let stepsHtml = '';
     
     // 기본 진행 상태
     stepsHtml += `
         <div class="progress-step">
-            <span class="step-name">진행 상태:</span> ${progressData.message}
+            <span class="step-name">진행 상태:</span> ${progressData.message || '처리 중...'}
         </div>
     `;
     
     // 전체 진행률
-    if (progressData.percentage !== null) {
+    if (progressData.percentage !== null && progressData.percentage !== undefined) {
         stepsHtml += `
             <div class="progress-step">
                 <span class="step-name">전체 진행률:</span> ${progressData.percentage}%
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progressData.percentage}%"></div>
+                </div>
             </div>
         `;
     }
@@ -174,16 +334,6 @@ function updateProgressDetails(progressData) {
         `;
     }
     
-    // 리포트 ID
-    if (progressData.reportId) {
-        stepsHtml += `
-            <div class="progress-step">
-                <span class="step-name">리포트 ID:</span> 
-                <span class="step-detail">${progressData.reportId}</span>
-            </div>
-        `;
-    }
-    
     // 시간 정보
     if (progressData.timestamp) {
         const time = new Date(progressData.timestamp).toLocaleTimeString();
@@ -198,7 +348,164 @@ function updateProgressDetails(progressData) {
     githubProgressDetailsDiv.classList.add('visible');
 }
 
-// 저장소 통계 로드
+/**
+ * 리포트 생성 상태 관리 함수
+ */
+function setReportGeneratingState(isGenerating, reportType = null) {
+    if (isGenerating) {
+        // 미리보기 버튼들 비활성화 및 로딩 상태 표시
+        githubPreviewWeeklyBtn.disabled = true;
+        githubPreviewMonthlyBtn.disabled = true;
+        githubPreviewWeeklyBtn.classList.add('loading');
+        githubPreviewMonthlyBtn.classList.add('loading');
+        
+        // 취소 버튼 표시
+        githubCancelReportBtn.style.display = 'inline-block';
+        
+        // 상태 표시 업데이트
+        githubReportStatusSpan.textContent = '통계 수집 중...';
+        githubReportStatusSpan.className = 'report-status generating';
+        
+        // 미리보기 영역에 로딩 표시
+        githubReportPreviewDiv.innerHTML = `
+            <div class="report-preview-loading">
+                <div class="loading-spinner"></div>
+                <div>GitHub 리포지토리에서 통계를 수집하고 있습니다...</div>
+                <div>새로고침해도 작업이 계속됩니다.</div>
+            </div>
+        `;
+        
+        // 버튼 텍스트 변경
+        if (reportType === 'weekly') {
+            githubPreviewWeeklyBtn.textContent = '주간 리포트 수집 중...';
+        } else if (reportType === 'monthly') {
+            githubPreviewMonthlyBtn.textContent = '월간 리포트 수집 중...';
+        }
+        
+        // 전송 버튼 영역 숨기기
+        githubSendButtonsDiv.style.display = 'none';
+        
+    } else {
+        // 버튼들 활성화 및 로딩 상태 제거
+        githubPreviewWeeklyBtn.disabled = false;
+        githubPreviewMonthlyBtn.disabled = false;
+        githubPreviewWeeklyBtn.classList.remove('loading');
+        githubPreviewMonthlyBtn.classList.remove('loading');
+        
+        // 취소 버튼 숨기기
+        githubCancelReportBtn.style.display = 'none';
+        
+        // 버튼 텍스트 복원
+        githubPreviewWeeklyBtn.textContent = 'GitHub 주간 리포트 미리보기';
+        githubPreviewMonthlyBtn.textContent = 'GitHub 월간 리포트 미리보기';
+        
+        // 진행도 숨기기
+        githubProgressDetailsDiv.classList.remove('visible');
+    }
+}
+
+/**
+ * 리포트 생성 완료 처리 함수
+ */
+function handleReportGenerationComplete(taskData) {
+    setReportGeneratingState(false);
+    
+    if (taskData.status === 'completed' && taskData.result) {
+        // 성공 처리
+        githubReportPreviewDiv.innerHTML = `<pre>${taskData.result.message}</pre>`;
+        githubSendButtonsDiv.style.display = 'block';
+        currentReportData = taskData.result.message;
+        currentReportType = taskData.type.includes('weekly') ? 'weekly' : 'monthly';
+        
+        githubReportStatusSpan.textContent = '생성 완료';
+        githubReportStatusSpan.className = 'report-status completed';
+        
+        const reportTypeText = currentReportType === 'weekly' ? '주간' : '월간';
+        showStatus(githubConfigMessageDiv, `${reportTypeText} 리포트 미리보기가 생성되었습니다. 발송하시려면 아래 버튼을 클릭하세요.`, 'success');
+    } else {
+        // 실패 처리
+        githubReportPreviewDiv.innerHTML = `
+            <div class="report-preview-placeholder">
+                <div style="color: #dc3545;">❌ 리포트 생성에 실패했습니다.</div>
+                <div style="color: #6c757d; font-size: 0.9em; margin-top: 10px;">${taskData.error || '알 수 없는 오류가 발생했습니다.'}</div>
+            </div>
+        `;
+        
+        githubReportStatusSpan.textContent = '생성 실패';
+        githubReportStatusSpan.className = 'report-status error';
+        
+        showStatus(githubConfigMessageDiv, taskData.error || '리포트 생성에 실패했습니다.', 'error');
+    }
+}
+
+/**
+ * 리포트 생성 취소 함수
+ */
+function cancelReportGeneration() {
+    if (!currentTaskId) return;
+    
+    fetch('/github/cancel-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: currentTaskId })
+    }).then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            setReportGeneratingState(false);
+            stopProgressTracking();
+            
+            // 상태 업데이트
+            githubReportStatusSpan.textContent = '취소됨';
+            githubReportStatusSpan.className = 'report-status cancelled';
+            
+            // 미리보기 영역 업데이트
+            githubReportPreviewDiv.innerHTML = `
+                <div class="report-preview-placeholder">
+                    <div class="cancel-message">
+                        리포트 생성이 취소되었습니다.<br>
+                        다시 생성하려면 미리보기 버튼을 클릭하세요.
+                    </div>
+                </div>
+            `;
+            
+            // 현재 상태 초기화
+            currentReportData = null;
+            currentReportType = null;
+            currentTaskId = null;
+            isTaskRunning = false;
+            
+            showStatus(githubConfigMessageDiv, '리포트 생성이 취소되었습니다.', 'info');
+        } else {
+            showStatus(githubConfigMessageDiv, result.message || '작업 취소에 실패했습니다.', 'error');
+        }
+    }).catch(error => {
+        console.error('Error cancelling task:', error);
+        showStatus(githubConfigMessageDiv, '작업 취소 중 오류가 발생했습니다.', 'error');
+    });
+}
+
+/**
+ * 리포트 미리보기 초기화 함수
+ */
+function resetReportPreview() {
+    currentReportData = null;
+    currentReportType = null;
+    currentTaskId = null;
+    isTaskRunning = false;
+    githubSendButtonsDiv.style.display = 'none';
+    githubReportStatusSpan.textContent = '대기 중';
+    githubReportStatusSpan.className = 'report-status';
+    githubReportPreviewDiv.innerHTML = `
+        <div class="report-preview-placeholder">
+            📊 리포트 미리보기를 보려면 위의 '미리보기' 버튼을 클릭하세요.
+        </div>
+    `;
+    githubProgressDetailsDiv.classList.remove('visible');
+}
+
+/**
+ * 저장소 통계 로드
+ */
 async function loadStorageStats() {
     try {
         const response = await fetch('/github/storage-stats');
@@ -216,7 +523,9 @@ async function loadStorageStats() {
     }
 }
 
-// 리포트 이력 로드
+/**
+ * 리포트 이력 로드
+ */
 async function loadReportHistory() {
     try {
         const response = await fetch('/github/report-history?limit=20');
@@ -236,7 +545,9 @@ async function loadReportHistory() {
     }
 }
 
-// 리포트 이력 표시
+/**
+ * 리포트 이력 표시
+ */
 function displayReportHistory(reports) {
     if (reports.length === 0) {
         githubReportHistoryDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">리포트 이력이 없습니다.</p>';
@@ -251,7 +562,7 @@ function displayReportHistory(reports) {
         const sizeText = report.size ? `${(report.size / 1024).toFixed(1)} KB` : 'N/A';
         
         historyHtml += `
-            <div class="report-item">
+            <div class="report-item clickable" onclick="showReportPreview('${report.id}')">
                 <div class="report-info">
                     <div class="report-title">${typeText} 리포트 (${categoryText})</div>
                     <div class="report-meta">
@@ -259,7 +570,7 @@ function displayReportHistory(reports) {
                     </div>
                 </div>
                 <div class="report-actions">
-                    <button class="secondary-btn" onclick="deleteReport('${report.id}')">삭제</button>
+                    <button class="secondary-btn" onclick="deleteReport('${report.id}'); event.stopPropagation();">삭제</button>
                 </div>
             </div>
         `;
@@ -268,7 +579,60 @@ function displayReportHistory(reports) {
     githubReportHistoryDiv.innerHTML = historyHtml;
 }
 
-// 리포트 삭제
+/**
+ * 리포트 미리보기 표시
+ */
+async function showReportPreview(reportId) {
+    try {
+        showStatus(githubConfigMessageDiv, '리포트 내용을 불러오는 중...', 'info');
+        
+        const response = await fetch(`/github/report-content/${reportId}`);
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
+                // 미리보기 영역에 리포트 내용 표시
+                githubReportPreviewDiv.innerHTML = `<pre>${result.data.content}</pre>`;
+                
+                // 상태 업데이트
+                githubReportStatusSpan.textContent = '이력 조회 완료';
+                githubReportStatusSpan.className = 'report-status completed';
+                
+                // 현재 리포트 데이터 설정 (재전송 가능하도록)
+                currentReportData = result.data.content;
+                currentReportType = result.data.type;
+                
+                // 전송 버튼 표시 (아카이브가 아닌 경우에만)
+                if (result.data.category === 'preview') {
+                    githubSendButtonsDiv.style.display = 'block';
+                } else {
+                    githubSendButtonsDiv.style.display = 'none';
+                }
+                
+                showStatus(githubConfigMessageDiv, '리포트 내용이 미리보기 영역에 표시되었습니다.', 'success');
+            } else {
+                showStatus(githubConfigMessageDiv, result.message || '리포트 내용을 불러올 수 없습니다.', 'error');
+                githubReportPreviewDiv.innerHTML = `
+                    <div class="report-preview-placeholder">
+                        <div style="color: #dc3545;">❌ 리포트 내용을 불러올 수 없습니다.</div>
+                        <div style="color: #6c757d; font-size: 0.9em; margin-top: 10px;">${result.message || '알 수 없는 오류가 발생했습니다.'}</div>
+                    </div>
+                `;
+            }
+        } else {
+            const errorData = await response.json();
+            showStatus(githubConfigMessageDiv, errorData.message || '리포트 내용을 불러올 수 없습니다.', 'error');
+        }
+    } catch (error) {
+        console.error('Report content load error:', error);
+        showStatus(githubConfigMessageDiv, '네트워크 오류가 발생했습니다.', 'error');
+    }
+}
+
+/**
+ * 리포트 삭제
+ */
 async function deleteReport(reportId) {
     if (!confirm('이 리포트를 삭제하시겠습니까?')) {
         return;
@@ -298,137 +662,6 @@ async function deleteReport(reportId) {
     }
 }
 
-// 리포트 생성 상태 관리 함수
-function setReportGeneratingState(isGenerating, reportType = null) {
-    isGeneratingReport = isGenerating;
-    reportGenerationAborted = false;
-    
-    if (isGenerating) {
-        // 미리보기 버튼들 비활성화 및 로딩 상태 표시
-        githubPreviewWeeklyBtn.disabled = true;
-        githubPreviewMonthlyBtn.disabled = true;
-        githubPreviewWeeklyBtn.classList.add('loading');
-        githubPreviewMonthlyBtn.classList.add('loading');
-        
-        // 취소 버튼 표시
-        githubCancelReportBtn.style.display = 'inline-block';
-        
-        // 상태 표시 업데이트
-        githubReportStatusSpan.textContent = '통계 수집 중...';
-        githubReportStatusSpan.className = 'report-status generating';
-        
-        // 미리보기 영역에 로딩 표시
-        githubReportPreviewDiv.innerHTML = `
-            <div class="report-preview-loading">
-                <div>GitHub 리포지토리에서 통계를 수집하고 있습니다...</div>
-                <div>잠시만 기다려주세요.</div>
-            </div>
-        `;
-        
-        // 버튼 텍스트 변경
-        if (reportType === 'weekly') {
-            githubPreviewWeeklyBtn.textContent = '주간 리포트 수집 중...';
-        } else if (reportType === 'monthly') {
-            githubPreviewMonthlyBtn.textContent = '월간 리포트 수집 중...';
-        }
-        
-        // 전송 버튼 영역 숨기기
-        githubSendButtonsDiv.style.display = 'none';
-        
-    } else {
-        // 버튼들 활성화 및 로딩 상태 제거
-        githubPreviewWeeklyBtn.disabled = false;
-        githubPreviewMonthlyBtn.disabled = false;
-        githubPreviewWeeklyBtn.classList.remove('loading');
-        githubPreviewMonthlyBtn.classList.remove('loading');
-        
-        // 취소 버튼 숨기기
-        githubCancelReportBtn.style.display = 'none';
-        
-        // 버튼 텍스트 복원
-        githubPreviewWeeklyBtn.textContent = 'GitHub 주간 리포트 미리보기';
-        githubPreviewMonthlyBtn.textContent = 'GitHub 월간 리포트 미리보기';
-    }
-}
-
-// 리포트 생성 취소 함수
-function cancelReportGeneration() {
-    if (!isGeneratingReport) return;
-    
-    reportGenerationAborted = true;
-    setReportGeneratingState(false);
-    
-    // 상태 업데이트
-    githubReportStatusSpan.textContent = '취소됨';
-    githubReportStatusSpan.className = 'report-status cancelled';
-    
-    // 미리보기 영역 업데이트
-    githubReportPreviewDiv.innerHTML = `
-        <div class="report-preview-placeholder">
-            <div class="cancel-message">
-                리포트 생성이 취소되었습니다.<br>
-                다시 생성하려면 미리보기 버튼을 클릭하세요.
-            </div>
-        </div>
-    `;
-    
-    // 현재 리포트 데이터 초기화
-    currentReportData = null;
-    currentReportType = null;
-    
-    showStatus(githubConfigMessageDiv, '리포트 생성이 취소되었습니다.', 'info');
-}
-
-// 리포트 생성 완료 처리 함수
-function handleReportGenerationComplete(data, reportType) {
-    if (reportGenerationAborted) {
-        return; // 취소된 경우 처리하지 않음
-    }
-    
-    setReportGeneratingState(false);
-    
-    if (data.success) {
-        // 성공 처리
-        githubReportPreviewDiv.textContent = data.preview;
-        githubSendButtonsDiv.style.display = 'block';
-        currentReportData = data.preview;
-        currentReportType = reportType;
-        
-        githubReportStatusSpan.textContent = '생성 완료';
-        githubReportStatusSpan.className = 'report-status completed';
-        
-        const reportTypeText = reportType === 'weekly' ? '주간' : '월간';
-        showStatus(githubConfigMessageDiv, `${reportTypeText} 리포트 미리보기가 생성되었습니다. 발송하시려면 아래 버튼을 클릭하세요.`, 'success');
-    } else {
-        // 실패 처리
-        githubReportPreviewDiv.innerHTML = `
-            <div class="report-preview-placeholder">
-                <div style="color: #dc3545;">❌ 리포트 생성에 실패했습니다.</div>
-                <div style="color: #6c757d; font-size: 0.9em; margin-top: 10px;">${data.message || '알 수 없는 오류가 발생했습니다.'}</div>
-            </div>
-        `;
-        
-        githubReportStatusSpan.textContent = '생성 실패';
-        githubReportStatusSpan.className = 'report-status error';
-        
-        showStatus(githubConfigMessageDiv, data.message || '리포트 생성에 실패했습니다.', 'error');
-    }
-}
-
-// 리포트 미리보기 초기화 함수
-function resetReportPreview() {
-    currentReportData = null;
-    currentReportType = null;
-    githubSendButtonsDiv.style.display = 'none';
-    githubReportStatusSpan.textContent = '대기 중';
-    githubReportStatusSpan.className = 'report-status';
-    githubReportPreviewDiv.innerHTML = `
-        <div class="report-preview-placeholder">
-            📊 리포트 미리보기를 보려면 위의 '미리보기' 버튼을 클릭하세요.
-        </div>
-    `;
-}
-
 // 이벤트 리스너들
 githubRefreshStatusBtn.addEventListener('click', async () => {
     await loadGitHubStatus();
@@ -436,70 +669,74 @@ githubRefreshStatusBtn.addEventListener('click', async () => {
 });
 
 githubPreviewWeeklyBtn.addEventListener('click', async () => {
-    if (isGeneratingReport) return;
+    if (isTaskRunning) return;
     
     try {
-        setReportGeneratingState(true, 'weekly');
         showStatus(githubConfigMessageDiv, 'GitHub 주간 리포트 미리보기 생성 중...', 'info');
         
         const response = await fetch('/github/preview-weekly-report', { method: 'POST' });
         
-        // 취소 확인
-        if (reportGenerationAborted) return;
-        
         if (response.ok) {
-            const data = await response.json();
-            handleReportGenerationComplete(data, 'weekly');
+            const result = await response.json();
+            
+            if (result.isAsync) {
+                // 백그라운드 작업으로 처리
+                currentTaskId = result.taskId;
+                isTaskRunning = true;
+                setReportGeneratingState(true, 'weekly');
+                startProgressTracking(result.taskId);
+                showStatus(githubConfigMessageDiv, '주간 리포트 생성이 백그라운드에서 시작되었습니다.', 'info');
+            } else {
+                // 즉시 결과 처리 (캐시된 결과 등)
+                handleReportGenerationComplete({
+                    status: 'completed',
+                    result: result,
+                    type: 'github_weekly_report'
+                });
+            }
         } else {
             const errorData = await response.json();
-            const errorResponse = {
-                success: false,
-                message: errorData.message || 'GitHub 주간 리포트 미리보기 생성에 실패했습니다.'
-            };
-            handleReportGenerationComplete(errorResponse, 'weekly');
+            showStatus(githubConfigMessageDiv, errorData.message || 'GitHub 주간 리포트 미리보기 생성에 실패했습니다.', 'error');
         }
     } catch (error) {
-        if (!reportGenerationAborted) {
-            const errorResponse = {
-                success: false,
-                message: 'GitHub 주간 리포트 미리보기 생성 중 오류가 발생했습니다.'
-            };
-            handleReportGenerationComplete(errorResponse, 'weekly');
-        }
+        console.error('Weekly report preview error:', error);
+        showStatus(githubConfigMessageDiv, 'GitHub 주간 리포트 미리보기 생성 중 오류가 발생했습니다.', 'error');
     }
 });
 
 githubPreviewMonthlyBtn.addEventListener('click', async () => {
-    if (isGeneratingReport) return;
+    if (isTaskRunning) return;
     
     try {
-        setReportGeneratingState(true, 'monthly');
         showStatus(githubConfigMessageDiv, 'GitHub 월간 리포트 미리보기 생성 중...', 'info');
         
         const response = await fetch('/github/preview-monthly-report', { method: 'POST' });
         
-        // 취소 확인
-        if (reportGenerationAborted) return;
-        
         if (response.ok) {
-            const data = await response.json();
-            handleReportGenerationComplete(data, 'monthly');
+            const result = await response.json();
+            
+            if (result.isAsync) {
+                // 백그라운드 작업으로 처리
+                currentTaskId = result.taskId;
+                isTaskRunning = true;
+                setReportGeneratingState(true, 'monthly');
+                startProgressTracking(result.taskId);
+                showStatus(githubConfigMessageDiv, '월간 리포트 생성이 백그라운드에서 시작되었습니다.', 'info');
+            } else {
+                // 즉시 결과 처리 (캐시된 결과 등)
+                handleReportGenerationComplete({
+                    status: 'completed',
+                    result: result,
+                    type: 'github_monthly_report'
+                });
+            }
         } else {
             const errorData = await response.json();
-            const errorResponse = {
-                success: false,
-                message: errorData.message || 'GitHub 월간 리포트 미리보기 생성에 실패했습니다.'
-            };
-            handleReportGenerationComplete(errorResponse, 'monthly');
+            showStatus(githubConfigMessageDiv, errorData.message || 'GitHub 월간 리포트 미리보기 생성에 실패했습니다.', 'error');
         }
     } catch (error) {
-        if (!reportGenerationAborted) {
-            const errorResponse = {
-                success: false,
-                message: 'GitHub 월간 리포트 미리보기 생성 중 오류가 발생했습니다.'
-            };
-            handleReportGenerationComplete(errorResponse, 'monthly');
-        }
+        console.error('Monthly report preview error:', error);
+        showStatus(githubConfigMessageDiv, 'GitHub 월간 리포트 미리보기 생성 중 오류가 발생했습니다.', 'error');
     }
 });
 
@@ -517,7 +754,7 @@ githubSendReportBtn.addEventListener('click', async () => {
             const response = await fetch('/github/send-report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: currentReportData })
+                body: JSON.stringify({ message: currentReportData, reportType: currentReportType })
             });
             
             if (response.ok) {
@@ -543,7 +780,7 @@ githubDiscardReportBtn.addEventListener('click', () => {
     }
 });
 
-// 나머지 이벤트 리스너들도 추가...
+// 나머지 이벤트 리스너들
 githubCheckAlertsBtn.addEventListener('click', async () => {
     try {
         showStatus(githubConfigMessageDiv, 'GitHub 활동 알림 체크 중...', 'info');
@@ -557,87 +794,6 @@ githubCheckAlertsBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         showStatus(githubConfigMessageDiv, 'GitHub 활동 알림 체크 중 오류가 발생했습니다.', 'error');
-    }
-});
-
-githubGenerateCustomReportBtn.addEventListener('click', async () => {
-    const startDate = githubStartDateInput.value;
-    const endDate = githubEndDateInput.value;
-    const sendToChannel = githubSendToChannelCheckbox.checked;
-    
-    if (!startDate || !endDate) {
-        showStatus(githubCustomReportMessageDiv, '시작일과 종료일을 모두 입력해주세요.', 'error');
-        return;
-    }
-    
-    try {
-        showStatus(githubCustomReportMessageDiv, '커스텀 리포트 생성 중...', 'info');
-        const response = await fetch('/github/custom-report', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate, sendToChannel })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            showStatus(githubCustomReportMessageDiv, data.message, 'success');
-            
-            // 리포트 미리보기 업데이트
-            if (data.report) {
-                githubReportPreviewDiv.textContent = data.report;
-            }
-        } else {
-            const errorData = await response.json();
-            showStatus(githubCustomReportMessageDiv, errorData.message, 'error');
-        }
-    } catch (error) {
-        showStatus(githubCustomReportMessageDiv, '커스텀 리포트 생성 중 오류가 발생했습니다.', 'error');
-    }
-});
-
-githubGetMemberStatsBtn.addEventListener('click', async () => {
-    const githubUsername = githubMemberSelect.value;
-    const startDate = githubMemberStartDateInput.value;
-    const endDate = githubMemberEndDateInput.value;
-    
-    if (!githubUsername) {
-        showStatus(githubMemberStatsResultDiv, '멤버를 선택해주세요.', 'error');
-        return;
-    }
-    
-    if (!startDate || !endDate) {
-        showStatus(githubMemberStatsResultDiv, '분석 기간을 입력해주세요.', 'error');
-        return;
-    }
-    
-    try {
-        showStatus(githubMemberStatsResultDiv, '멤버 통계 조회 중...', 'info');
-        const response = await fetch('/github/member-stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ githubUsername, startDate, endDate })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                const stats = data.data;
-                const statsText = `
-📊 ${stats.displayName} (${stats.username}) 통계\n
-- 커밋: ${stats.commits}회\n- PR 생성: ${stats.prsCreated}개\n- PR 리뷰: ${stats.prsReviewed}개\n- 이슈 생성: ${stats.issuesCreated}개\n- 이슈 해결: ${stats.issuesClosed}개\n- 코드 변경: +${stats.linesAdded} / -${stats.linesDeleted}\n- 리뷰 코멘트: ${stats.reviewComments}개
-                `.trim();
-                
-                githubMemberStatsResultDiv.innerHTML = `<pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 0.9em; line-height: 1.4; white-space: pre-wrap;">${statsText}</pre>`;
-                githubMemberStatsResultDiv.style.display = 'block';
-            } else {
-                showStatus(githubMemberStatsResultDiv, data.message, 'error');
-            }
-        } else {
-            const errorData = await response.json();
-            showStatus(githubMemberStatsResultDiv, errorData.message, 'error');
-        }
-    } catch (error) {
-        showStatus(githubMemberStatsResultDiv, '멤버 통계 조회 중 오류가 발생했습니다.', 'error');
     }
 });
 

@@ -1,110 +1,4 @@
-/**
- * GitHub 리포트 생성 취소 핸들러
- */
-async function handleGitHubCancelGeneration(req, res) {
-    logger.info('Processing GitHub report generation cancellation');
-    const gitHubService = scheduleService.getGitHubService();
-    
-    const result = gitHubService.cancelCurrentGeneration();
-    
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-    res.end(JSON.stringify(result));
-}
-
-/**
- * GitHub 리포트 이력 조회 핸들러
- */
-async function handleGitHubReportHistory(req, res) {
-    logger.debug('Serving GitHub report history');
-    
-    try {
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        const type = url.searchParams.get('type');
-        const limit = parseInt(url.searchParams.get('limit')) || 20;
-        
-        const gitHubService = scheduleService.getGitHubService();
-        const history = gitHubService.getReportHistory(type, limit);
-        
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: true, data: history }));
-    } catch (error) {
-        logger.error('Error getting GitHub report history:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: false, message: '리포트 이력 조회 중 오류가 발생했습니다.' }));
-    }
-}
-
-/**
- * GitHub 리포트 삭제 핸들러
- */
-async function handleGitHubDeleteReport(req, res) {
-    logger.info('Processing GitHub report deletion');
-    
-    try {
-        const body = await getRequestBody(req);
-        const { reportId } = JSON.parse(body);
-        
-        if (!reportId) {
-            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
-            res.end(JSON.stringify({ success: false, message: '리포트 ID가 필요합니다.' }));
-            return;
-        }
-        
-        const gitHubService = scheduleService.getGitHubService();
-        const result = gitHubService.deleteReport(reportId);
-        
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify(result));
-    } catch (error) {
-        logger.error('Error deleting GitHub report:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: false, message: '리포트 삭제 중 오류가 발생했습니다.' }));
-    }
-}
-
-/**
- * GitHub 저장소 통계 조회 핸들러
- */
-async function handleGitHubStorageStats(req, res) {
-    logger.debug('Serving GitHub storage statistics');
-    
-    try {
-        const gitHubService = scheduleService.getGitHubService();
-        const stats = gitHubService.getStorageStats();
-        
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: true, data: stats }));
-    } catch (error) {
-        logger.error('Error getting GitHub storage stats:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: false, message: '저장소 통계 조회 중 오류가 발생했습니다.' }));
-    }
-}
-
-/**
- * GitHub 캐시 정리 핸들러
- */
-async function handleGitHubClearCache(req, res) {
-    logger.info('Processing GitHub cache clear request');
-    
-    try {
-        const gitHubService = scheduleService.getGitHubService();
-        const result = gitHubService.clearCache();
-        
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({
-            success: result.success,
-            message: result.success 
-                ? `캐시가 정리되었습니다. (${result.deletedCount}개 파일 삭제)`
-                : '캐시 정리 중 오류가 발생했습니다.',
-            data: result
-        }));
-    } catch (error) {
-        logger.error('Error clearing GitHub cache:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ success: false, message: '캐시 정리 중 오류가 발생했습니다.' }));
-    }
-}// src/routes/web-routes.js
+// src/routes/web-routes.js
 // 웹 라우팅 핸들러
 
 const fs = require('fs');
@@ -200,7 +94,7 @@ async function handleWebRoutes(req, res) {
         else if (req.url === '/github/cancel-generation' && req.method === 'POST') {
             await handleGitHubCancelGeneration(req, res);
         }
-        else if (req.url === '/github/report-history' && req.method === 'GET') {
+        else if ((req.url === '/github/report-history' || req.url.startsWith('/github/report-history?')) && req.method === 'GET') {
             await handleGitHubReportHistory(req, res);
         }
         else if (req.url === '/github/delete-report' && req.method === 'POST') {
@@ -211,6 +105,15 @@ async function handleWebRoutes(req, res) {
         }
         else if (req.url === '/github/clear-cache' && req.method === 'POST') {
             await handleGitHubClearCache(req, res);
+        }
+        else if (req.url.startsWith('/github/task-status/') && req.method === 'GET') {
+            await handleGitHubTaskStatus(req, res);
+        }
+        else if (req.url === '/github/running-tasks' && req.method === 'GET') {
+            await handleGitHubRunningTasks(req, res);
+        }
+        else if (req.url.startsWith('/github/report-content/') && req.method === 'GET') {
+            await handleGitHubReportContent(req, res);
         }
         // 정적 파일 제공
         else if (req.url.startsWith('/public/') && req.method === 'GET') {
@@ -428,23 +331,29 @@ async function handleGitHubWeeklyReportPreview(req, res) {
     logger.info('Processing GitHub weekly report preview');
     const gitHubService = scheduleService.getGitHubService();
     
-    // 진행도 콜백 설정
-    gitHubService.setProgressCallback((progress) => {
-        // 실제 프로덕션에서는 WebSocket 또는 Server-Sent Events 사용 가능
-        logger.debug(`GitHub Report Progress: ${progress.message}`);
-    });
-    
-    const result = await gitHubService.generateWeeklyReport();
-    
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-    res.end(JSON.stringify({ 
-        success: result.success, 
-        message: result.message,
-        data: result.data,
-        preview: result.message,
-        reportType: 'weekly',
-        cached: result.cached || false
-    }));
+    try {
+        const result = await gitHubService.generateWeeklyReport();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ 
+            success: result.success, 
+            message: result.message,
+            data: result.data,
+            preview: result.message,
+            reportType: 'weekly',
+            cached: result.cached || false,
+            taskId: result.taskId,
+            isAsync: result.isAsync
+        }));
+    } catch (error) {
+        logger.error('Error generating weekly report preview:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ 
+            success: false, 
+            message: 'GitHub 주간 리포트 미리보기 생성 중 오류가 발생했습니다.',
+            error: error.message
+        }));
+    }
 }
 
 /**
@@ -488,23 +397,29 @@ async function handleGitHubMonthlyReportPreview(req, res) {
     logger.info('Processing GitHub monthly report preview');
     const gitHubService = scheduleService.getGitHubService();
     
-    // 진행도 콜백 설정
-    gitHubService.setProgressCallback((progress) => {
-        // 실제 프로덕션에서는 WebSocket 또는 Server-Sent Events 사용 가능
-        logger.debug(`GitHub Report Progress: ${progress.message}`);
-    });
-    
-    const result = await gitHubService.generateMonthlyReport();
-    
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-    res.end(JSON.stringify({ 
-        success: result.success, 
-        message: result.message,
-        data: result.data,
-        preview: result.message,
-        reportType: 'monthly',
-        cached: result.cached || false
-    }));
+    try {
+        const result = await gitHubService.generateMonthlyReport();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ 
+            success: result.success, 
+            message: result.message,
+            data: result.data,
+            preview: result.message,
+            reportType: 'monthly',
+            cached: result.cached || false,
+            taskId: result.taskId,
+            isAsync: result.isAsync
+        }));
+    } catch (error) {
+        logger.error('Error generating monthly report preview:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ 
+            success: false, 
+            message: 'GitHub 월간 리포트 미리보기 생성 중 오류가 발생했습니다.',
+            error: error.message
+        }));
+    }
 }
 
 /**
@@ -731,6 +646,226 @@ function getRequestBody(req) {
         req.on('end', () => resolve(body));
         req.on('error', reject);
     });
+}
+
+/**
+ * GitHub 리포트 생성 취소 핸들러
+ */
+async function handleGitHubCancelGeneration(req, res) {
+    logger.info('Processing GitHub report generation cancellation');
+    const gitHubService = scheduleService.getGitHubService();
+    
+    const result = gitHubService.cancelCurrentGeneration();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+    res.end(JSON.stringify(result));
+}
+
+/**
+ * GitHub 리포트 이력 조회 핸들러
+ */
+async function handleGitHubReportHistory(req, res) {
+    logger.info(`Serving GitHub report history: ${req.url}`);
+    
+    try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const type = url.searchParams.get('type');
+        const limit = parseInt(url.searchParams.get('limit')) || 20;
+        
+        logger.debug(`Request params - type: ${type}, limit: ${limit}`);
+        
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService) {
+            logger.error('GitHub service not available');
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        if (!gitHubService.isEnabled) {
+            logger.warn('GitHub service is disabled');
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스가 비활성화되어 있습니다.' }));
+            return;
+        }
+        
+        logger.debug('Calling getReportHistory method');
+        const history = gitHubService.getReportHistory(type, limit);
+        logger.debug(`Retrieved ${history.length} history records`);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: history }));
+    } catch (error) {
+        logger.error('Error getting GitHub report history:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '리포트 이력 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 리포트 삭제 핸들러
+ */
+async function handleGitHubDeleteReport(req, res) {
+    logger.info('Processing GitHub report deletion');
+    
+    try {
+        const body = await getRequestBody(req);
+        const { reportId } = JSON.parse(body);
+        
+        if (!reportId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '리포트 ID가 필요합니다.' }));
+            return;
+        }
+        
+        const gitHubService = scheduleService.getGitHubService();
+        const result = gitHubService.deleteReport(reportId);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        logger.error('Error deleting GitHub report:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '리포트 삭제 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 저장소 통계 조회 핸들러
+ */
+async function handleGitHubStorageStats(req, res) {
+    logger.debug('Serving GitHub storage statistics');
+    
+    try {
+        const gitHubService = scheduleService.getGitHubService();
+        const stats = gitHubService.getStorageStats();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: stats }));
+    } catch (error) {
+        logger.error('Error getting GitHub storage stats:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '저장소 통계 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 캐시 정리 핸들러
+ */
+async function handleGitHubClearCache(req, res) {
+    logger.info('Processing GitHub cache clear request');
+    
+    try {
+        const gitHubService = scheduleService.getGitHubService();
+        const result = gitHubService.clearCache();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({
+            success: result.success,
+            message: result.success 
+                ? `캐시가 정리되었습니다. (${result.deletedCount}개 파일 삭제)`
+                : '캐시 정리 중 오류가 발생했습니다.',
+            data: result
+        }));
+    } catch (error) {
+        logger.error('Error clearing GitHub cache:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '캐시 정리 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 작업 상태 조회 핸들러
+ */
+async function handleGitHubTaskStatus(req, res) {
+    logger.debug('Serving GitHub task status');
+    
+    try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const taskId = url.pathname.split('/').pop();
+        
+        if (!taskId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업 ID가 필요합니다.' }));
+            return;
+        }
+        
+        const gitHubService = scheduleService.getGitHubService();
+        const status = gitHubService.getTaskStatus(taskId);
+        
+        if (!status) {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업을 찾을 수 없습니다.' }));
+            return;
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: status }));
+    } catch (error) {
+        logger.error('Error getting GitHub task status:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '작업 상태 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 실행 중인 작업 조회 핸들러
+ */
+async function handleGitHubRunningTasks(req, res) {
+    logger.debug('Serving GitHub running tasks');
+    
+    try {
+        const gitHubService = scheduleService.getGitHubService();
+        const runningTasks = gitHubService.getRunningTasks();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: runningTasks }));
+    } catch (error) {
+        logger.error('Error getting GitHub running tasks:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '실행 중인 작업 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 리포트 내용 조회 핸들러
+ */
+async function handleGitHubReportContent(req, res) {
+    logger.debug('Serving GitHub report content');
+    
+    try {
+        const reportId = req.url.split('/').pop();
+        
+        if (!reportId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '리포트 ID가 필요합니다.' }));
+            return;
+        }
+        
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService || !gitHubService.isEnabled) {
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        const reportContent = gitHubService.getReportContent(reportId);
+        
+        if (!reportContent) {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '리포트를 찾을 수 없습니다.' }));
+            return;
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: reportContent }));
+    } catch (error) {
+        logger.error('Error getting GitHub report content:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '리포트 내용 조회 중 오류가 발생했습니다.' }));
+    }
 }
 
 module.exports = {

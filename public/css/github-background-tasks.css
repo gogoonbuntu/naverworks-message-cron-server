@@ -1,0 +1,509 @@
+/* public/css/github-background-tasks.css */
+/* GitHub 백그라운드 작업 관련 스타일 */
+
+/* 진행도 표시 영역 */
+.progress-details {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    display: none;
+    transition: all 0.3s ease;
+}
+
+.progress-details.visible {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 진행도 단계 */
+.progress-step {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.progress-step:last-child {
+    margin-bottom: 0;
+}
+
+.step-name {
+    font-weight: 600;
+    color: #999097;
+    min-width: 120px;
+}
+
+.step-detail {
+    font-family: monospace;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+/* 진행도 바 */
+.progress-bar {
+    width: 200px;
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-left: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* 리포트 상태 표시 */
+.report-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.report-status.generating {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.report-status.running {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    animation: pulse 2s infinite;
+}
+
+.report-status.completed {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.report-status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.report-status.cancelled {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* 로딩 상태 표시 */
+.report-preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    text-align: center;
+}
+
+.report-preview-loading > div {
+    margin-bottom: 10px;
+}
+
+.report-preview-loading > div:last-child {
+    margin-bottom: 0;
+    font-size: 14px;
+    color: #28a745;
+    font-weight: 600;
+}
+
+/* 로딩 스피너 */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 버튼 로딩 상태 */
+.execute-btn.loading,
+.secondary-btn.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.execute-btn.loading::after,
+.secondary-btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    margin-left: -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
+}
+
+/* 취소 메시지 */
+.cancel-message {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 리포트 이력 아이템 */
+.report-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+}
+
+.report-item:hover {
+    background-color: #f8f9fa;
+    border-color: #007bff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.report-item:last-child {
+    margin-bottom: 0;
+}
+
+.report-info {
+    flex: 1;
+}
+
+.report-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.report-meta {
+    color: #6c757d;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.report-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 저장소 통계 */
+.storage-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.storage-stat {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
+}
+
+.storage-stat h4 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.storage-stat p {
+    margin: 0;
+    color: #007bff;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+/* 작업 상태 표시기 */
+.task-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1976d2;
+}
+
+.task-status-indicator.running {
+    background-color: #e8f5e8;
+    border-color: #c8e6c9;
+    color: #2e7d32;
+}
+
+.task-status-indicator.completed {
+    background-color: #f3e5f5;
+    border-color: #ce93d8;
+    color: #7b1fa2;
+}
+
+.task-status-indicator.error {
+    background-color: #ffebee;
+    border-color: #ffcdd2;
+    color: #c62828;
+}
+
+.task-status-indicator::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.task-status-indicator.running::before {
+    animation: pulse 1.5s infinite;
+}
+
+/* 빠른 액션 버튼 그룹 */
+.quick-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.quick-actions .execute-btn,
+.quick-actions .secondary-btn {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.quick-actions .execute-btn:hover,
+.quick-actions .secondary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.quick-actions .execute-btn:active,
+.quick-actions .secondary-btn:active {
+    transform: translateY(0);
+}
+
+/* 응답형 디자인 */
+@media (max-width: 768px) {
+    .progress-step {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .step-name {
+        min-width: auto;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        margin-left: 0;
+    }
+    
+    .report-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .report-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .storage-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .quick-actions {
+        flex-direction: column;
+    }
+    
+    .quick-actions .execute-btn,
+    .quick-actions .secondary-btn {
+        min-width: auto;
+    }
+}
+
+/* 다크 모드 지원 */
+@media (prefers-color-scheme: dark) {
+    .progress-details {
+        background-color: #343a40;
+        border-color: #495057;
+    }
+    
+    .progress-step {
+        background-color: #495057;
+        border-color: #6c757d;
+    }
+    
+    .step-name {
+        color: #f8f9fa;
+    }
+    
+    .step-detail {
+        color: #adb5bd;
+    }
+    
+    .progress-bar {
+        background-color: #6c757d;
+    }
+    
+    .report-item {
+        background-color: #495057;
+        border-color: #6c757d;
+    }
+    
+    .report-item:hover {
+        background-color: #5a6268;
+        border-color: #007bff;
+    }
+    
+    .report-title {
+        color: #f8f9fa;
+    }
+    
+    .report-meta {
+        color: #adb5bd;
+    }
+    
+    .storage-stat {
+        background-color: #495057;
+        border-color: #6c757d;
+    }
+    
+    .storage-stat h4 {
+        color: #f8f9fa;
+    }
+    
+    .cancel-message {
+        background-color: #856404;
+        color: #fff3cd;
+        border-color: #ffeaa7;
+    }
+}
+
+/* 접근성 개선 */
+@media (prefers-reduced-motion: reduce) {
+    .progress-fill::after,
+    .loading-spinner,
+    .execute-btn.loading::after,
+    .secondary-btn.loading::after,
+    .report-status.running,
+    .task-status-indicator.running::before {
+        animation: none;
+    }
+    
+    .progress-details.visible {
+        animation: none;
+    }
+    
+    .report-item:hover {
+        transform: none;
+    }
+    
+    .quick-actions .execute-btn:hover,
+    .quick-actions .secondary-btn:hover {
+        transform: none;
+    }
+}
+
+/* 포커스 스타일 */
+.execute-btn:focus,
+.secondary-btn:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* 텍스트 선택 방지 */
+.report-status,
+.task-status-indicator,
+.loading-spinner {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}

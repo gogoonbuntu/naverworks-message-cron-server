@@ -291,12 +291,16 @@ function getActiveSchedules() {
 }
 
 /**
- * GitHub 서비스 반환
- * @returns {Object} - GitHub 서비스 객체
- */
+* GitHub 서비스 반환
+* @returns {Object} - GitHub 서비스 객체
+*/
 function getGitHubService() {
-    return gitHubService;
-}
+if (!gitHubService) {
+        logger.error('GitHub service not initialized');
+            return null;
+        }
+        return gitHubService;
+    }
 
 module.exports = {
     clearAllScheduledJobs,
