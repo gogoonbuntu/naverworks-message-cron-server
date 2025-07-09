@@ -1,0 +1,260 @@
+/* GitHub 관련 스타일 */
+.report-preview-section {
+    position: relative;
+}
+
+.report-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.report-preview-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.report-status {
+    font-size: 0.85em;
+    color: #6c757d;
+    font-weight: normal;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #f8f9fa;
+}
+
+.report-status.generating {
+    color: #007bff;
+    background: #e3f2fd;
+    font-weight: 500;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.report-status.completed {
+    color: #28a745;
+    background: #e8f5e8;
+    font-weight: 500;
+}
+
+.report-status.error {
+    color: #dc3545;
+    background: #f8d7da;
+    font-weight: 500;
+}
+
+.report-status.cancelled {
+    color: #6c757d;
+    background: #f8f9fa;
+    font-weight: 500;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.report-preview-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.report-preview-actions button {
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 0.9em;
+}
+
+.report-preview-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: #6c757d;
+    font-style: italic;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.report-preview-loading::before {
+    content: "";
+    width: 24px;
+    height: 24px;
+    border: 3px solid #6c757d;
+    border-top: 3px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.report-preview-content {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    min-height: 120px;
+    border: 1px solid #ddd;
+    position: relative;
+}
+
+.report-preview-placeholder {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.report-send-actions {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.report-send-actions h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1em;
+}
+
+.report-send-actions .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* 리포트 관리 관련 스타일 */
+.report-management {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.report-management h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.storage-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.storage-stat {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #28a745;
+    text-align: center;
+}
+
+.storage-stat h4 {
+    margin: 0 0 5px 0;
+    color: #28a745;
+    font-size: 0.9em;
+}
+
+.storage-stat p {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.report-history {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+
+.report-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.report-item:last-child {
+    border-bottom: none;
+}
+
+.report-item:hover {
+    background: #f8f9fa;
+}
+
+.report-info {
+    flex-grow: 1;
+}
+
+.report-info .report-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.report-info .report-meta {
+    font-size: 0.85em;
+    color: #666;
+}
+
+.report-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.report-actions button {
+    padding: 4px 8px;
+    font-size: 0.8em;
+    margin: 0;
+}
+
+.progress-details {
+    margin-top: 10px;
+    padding: 10px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    font-size: 0.9em;
+    color: #0c5460;
+    display: none;
+}
+
+.progress-details.visible {
+    display: block;
+}
+
+.progress-step {
+    margin-bottom: 5px;
+}
+
+.progress-step:last-child {
+    margin-bottom: 0;
+}
+
+.progress-step .step-name {
+    font-weight: 600;
+}
+
+.progress-step .step-detail {
+    color: #666;
+    font-style: italic;
+}
+
+.cancel-message {
+    color: #dc3545;
+    font-weight: 500;
+    line-height: 1.5;
+}

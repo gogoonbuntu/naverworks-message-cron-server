@@ -1,0 +1,326 @@
+/* 기본 스타일 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    background-color: #f4f6f9;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    color: #333;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 1000px;
+    box-sizing: border-box;
+    border: 1px solid #e0e0e0;
+}
+
+h1, h2 {
+    color: #2c3e50;
+    margin-bottom: 25px;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* 탭 네비게이션 스타일 */
+.tab-nav {
+    display: flex;
+    border-bottom: 2px solid #e0e0e0;
+    margin-bottom: 30px;
+}
+
+.tab-nav button {
+    background-color: transparent;
+    border: none;
+    padding: 15px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+    color: #666;
+    font-weight: 500;
+}
+
+.tab-nav button:hover {
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+.tab-nav button.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+/* 탭 컨텐츠 스타일 */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #fcfcfc;
+}
+
+/* 폼 요소 스타일 */
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="date"],
+input[type="checkbox"],
+textarea,
+select {
+    width: calc(100% - 22px);
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95em;
+    box-sizing: border-box;
+}
+
+input[type="checkbox"] {
+    width: auto;
+    margin-right: 5px;
+}
+
+textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+/* 버튼 스타일 */
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+    margin-top: 10px;
+}
+
+button:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+}
+
+/* 버튼 변형 스타일 */
+button.delete-btn {
+    background-color: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+    margin-left: 10px;
+}
+
+button.delete-btn:hover {
+    background-color: #c82333;
+}
+
+button.edit-btn {
+    background-color: #ffc107;
+    color: #333;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+
+button.edit-btn:hover {
+    background-color: #e0a800;
+}
+
+button.execute-btn {
+    background-color: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+    margin-left: 10px;
+}
+
+button.execute-btn:hover {
+    background-color: #218838;
+}
+
+button.secondary-btn {
+    background-color: #6c757d;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.2);
+}
+
+button.secondary-btn:hover {
+    background-color: #545b62;
+}
+
+button.cancel-btn {
+    background-color: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+button.cancel-btn:hover {
+    background-color: #c82333;
+}
+
+/* 상태 메시지 스타일 */
+.status-message {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    background-color: #e9ecef;
+    color: #333;
+    border: 1px solid #dee2e6;
+}
+
+.status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.status-message.info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+/* 아이템 스타일 */
+.schedule-item, .team-member-item, .duty-item, .review-pair-item {
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    margin-bottom: 10px;
+    border: 1px solid #e9ecef;
+    border-left: 5px solid #007bff;
+    border-radius: 8px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.schedule-item.type-laptop_duty { border-left-color: #28a745; }
+.schedule-item.type-code_review { border-left-color: #6f42c1; }
+
+.schedule-item p, .team-member-item p, .duty-item p, .review-pair-item p {
+    margin: 5px 0;
+    font-size: 0.9em;
+}
+
+.schedule-item strong, .team-member-item strong, .duty-item strong, .review-pair-item strong {
+    color: #0056b3;
+}
+
+.schedule-item .actions, .team-member-item .actions, .duty-item .actions, .review-pair-item .actions {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.schedule-item .actions button, .team-member-item .actions button, .duty-item .actions button {
+    padding: 6px 12px;
+    font-size: 0.85em;
+    margin-left: 5px;
+}
+
+/* 유틸리티 스타일 */
+.cron-guide {
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.cron-guide a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.cron-guide a:hover {
+    text-decoration: underline;
+}
+
+.flex-group {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.flex-group label {
+    margin-bottom: 0;
+    margin-right: 10px;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.quick-actions button {
+    margin-top: 0;
+}
+
+/* 로딩 상태 스타일 */
+button.execute-btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+button.execute-btn.loading {
+    background-color: #6c757d;
+    cursor: wait;
+    position: relative;
+    padding-right: 50px;
+}
+
+button.execute-btn.loading::after {
+    content: "";
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: translateY(-50%) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(360deg); }
+}

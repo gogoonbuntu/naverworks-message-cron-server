@@ -212,6 +212,10 @@ async function handleWebRoutes(req, res) {
         else if (req.url === '/github/clear-cache' && req.method === 'POST') {
             await handleGitHubClearCache(req, res);
         }
+        // 정적 파일 제공
+        else if (req.url.startsWith('/public/') && req.method === 'GET') {
+            await handleStaticFile(req, res);
+        }
         else {
             await handle404(req, res);
         }
@@ -655,6 +659,55 @@ async function handleGitHubCheckAlerts(req, res) {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ success: false, message: '알림이 필요한 활동이 없습니다.' }));
     }
+}
+
+/**
+ * 정적 파일 핸들러
+ */
+async function handleStaticFile(req, res) {
+    const filePath = path.join(__dirname, '../../', req.url);
+    const extname = path.extname(filePath).toLowerCase();
+    
+    // MIME 타입 설정
+    const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.ico': 'image/x-icon',
+        '.svg': 'image/svg+xml',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.eot': 'application/vnd.ms-fontobject'
+    };
+    
+    const contentType = mimeTypes[extname] || 'application/octet-stream';
+    
+    // 파일 읽기
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            if (err.code === 'ENOENT') {
+                logger.debug(`Static file not found: ${req.url}`);
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=UTF-8' });
+                res.end('File not found');
+            } else {
+                logger.error(`Error reading static file ${req.url}:`, err);
+                res.writeHead(500, { 'Content-Type': 'text/plain; charset=UTF-8' });
+                res.end('Internal Server Error');
+            }
+            return;
+        }
+        
+        // 캐시 헤더 설정
+        res.setHeader('Cache-Control', 'public, max-age=3600'); // 1시간 캐시
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+        logger.debug(`Static file served: ${req.url}`);
+    });
 }
 
 /**
