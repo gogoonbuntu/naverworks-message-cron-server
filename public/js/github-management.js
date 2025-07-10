@@ -60,12 +60,54 @@ function initializeGitHubManagement() {
     loadGitHubStatus();
     loadStorageStats();
     
+    // 오늘 생성된 최근 리포트 로드
+    loadLatestTodayReport();
+    
     // 주기적으로 실행 중인 작업 확인
     setInterval(checkRunningTasks, 5000); // 5초마다 확인
 }
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', initializeGitHubManagement);
+
+/**
+ * 오늘 생성된 최근 리포트 로드
+ */
+async function loadLatestTodayReport() {
+    try {
+        const response = await fetch('/github/latest-report');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+                const report = result.data;
+                
+                // 리포트 내용을 미리보기 영역에 표시
+                githubReportPreviewDiv.innerHTML = `<pre>${report.content}</pre>`;
+                
+                // 상태 업데이트
+                const reportTypeText = report.type === 'weekly' ? '주간' : report.type === 'monthly' ? '월간' : '일반';
+                githubReportStatusSpan.textContent = `최근 리포트 (오늘 생성된 ${reportTypeText})`;
+                githubReportStatusSpan.className = 'report-status completed';
+                
+                // 현재 리포트 데이터 설정
+                currentReportData = report.content;
+                currentReportType = report.type;
+                
+                // 전송 버튼 표시
+                githubSendButtonsDiv.style.display = 'block';
+                
+                console.log(`Loaded latest today report: ${report.id} (${report.type})`);
+            } else {
+                // 오늘 생성된 리포트가 없음
+                resetReportPreview();
+            }
+        } else {
+            console.warn('Failed to load latest today report:', response.status);
+        }
+    } catch (error) {
+        console.error('Error loading latest today report:', error);
+    }
+}
 
 /**
  * GitHub 상태 로드
@@ -422,6 +464,9 @@ function handleReportGenerationComplete(taskData) {
         
         const reportTypeText = currentReportType === 'weekly' ? '주간' : '월간';
         showStatus(githubConfigMessageDiv, `${reportTypeText} 리포트 미리보기가 생성되었습니다. 발송하시려면 아래 버튼을 클릭하세요.`, 'success');
+        
+        // 새로 생성된 리포트이므로 저장소 통계 새로고침
+        loadStorageStats();
     } else {
         // 실패 처리
         githubReportPreviewDiv.innerHTML = `
@@ -763,6 +808,11 @@ githubSendReportBtn.addEventListener('click', async () => {
                 // 전송 후 초기화
                 resetReportPreview();
                 githubReportPreviewDiv.innerHTML = '<div class="report-preview-placeholder">📤 리포트가 성공적으로 전송되었습니다.</div>';
+                
+                // 새로 생성된 리포트가 있을 수 있으므로 잠시 후 최신 리포트 로드
+                setTimeout(() => {
+                    loadLatestTodayReport();
+                }, 1000);
             } else {
                 const errorData = await response.json();
                 showStatus(githubConfigMessageDiv, errorData.message, 'error');

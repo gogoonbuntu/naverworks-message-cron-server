@@ -17,6 +17,8 @@ class GitHubService {
         this.config = {};
         this.isEnabled = false;
         this.taskManager = new BackgroundTaskManager();
+        // 호환성을 위한 별칭
+        this.backgroundTaskManager = this.taskManager;
         
         this.ensureCacheDirectories();
         this.loadConfiguration();
@@ -1257,6 +1259,61 @@ class GitHubService {
             
         } catch (error) {
             logger.error(`Error getting report content for ${reportId}: ${error.message}`, error);
+            return null;
+        }
+    }
+
+    /**
+     * 오늘 생성된 최근 리포트 조회
+     * @returns {Object|null} - 최근 리포트 또는 null
+     */
+    getLatestTodayReport() {
+        try {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            const reports = [];
+            
+            // 미리보기 디렉토리에서 오늘 생성된 리포트 찾기
+            if (fs.existsSync(GITHUB_REPORTS_DIR)) {
+                const files = fs.readdirSync(GITHUB_REPORTS_DIR);
+                
+                files.forEach(file => {
+                    try {
+                        const filePath = path.join(GITHUB_REPORTS_DIR, file);
+                        const stat = fs.statSync(filePath);
+                        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        
+                        // 오늘 생성된 리포트인지 확인
+                        const reportDate = new Date(data.timestamp || stat.mtime);
+                        const reportDateStr = reportDate.toISOString().split('T')[0];
+                        
+                        if (reportDateStr === todayStr) {
+                            reports.push({
+                                id: data.id || file.replace('.json', ''),
+                                type: data.type || 'unknown',
+                                content: data.content,
+                                category: data.category || 'preview',
+                                timestamp: data.timestamp || stat.mtime.toISOString(),
+                                metadata: data.metadata || {}
+                            });
+                        }
+                    } catch (error) {
+                        logger.warn(`Error reading report file ${file}: ${error.message}`);
+                    }
+                });
+            }
+            
+            // 최신순 정렬하여 가장 최근 리포트 반환
+            if (reports.length > 0) {
+                reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                return reports[0];
+            }
+            
+            return null;
+            
+        } catch (error) {
+            logger.error(`Error getting latest today report: ${error.message}`, error);
             return null;
         }
     }

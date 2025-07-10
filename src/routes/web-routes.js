@@ -115,6 +115,18 @@ async function handleWebRoutes(req, res) {
         else if (req.url.startsWith('/github/report-content/') && req.method === 'GET') {
             await handleGitHubReportContent(req, res);
         }
+        else if (req.url === '/github/task-status' && req.method === 'GET') {
+            await handleGitHubTaskStatusAll(req, res);
+        }
+        else if (req.url.startsWith('/github/task-progress') && req.method === 'GET') {
+            await handleGitHubTaskProgress(req, res);
+        }
+        else if (req.url === '/github/cancel-task' && req.method === 'POST') {
+            await handleGitHubCancelTask(req, res);
+        }
+        else if (req.url === '/github/latest-report' && req.method === 'GET') {
+            await handleGitHubLatestReport(req, res);
+        }
         // 정적 파일 제공
         else if (req.url.startsWith('/public/') && req.method === 'GET') {
             await handleStaticFile(req, res);
@@ -865,6 +877,145 @@ async function handleGitHubReportContent(req, res) {
         logger.error('Error getting GitHub report content:', error);
         res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ success: false, message: '리포트 내용 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 작업 상태 전체 조회 핸들러
+ */
+async function handleGitHubTaskStatusAll(req, res) {
+    logger.debug('Serving all GitHub task status');
+    
+    try {
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService || !gitHubService.backgroundTaskManager) {
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        const allTasks = gitHubService.backgroundTaskManager.getAllTasks();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: allTasks }));
+    } catch (error) {
+        logger.error('Error getting all GitHub task status:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '작업 상태 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 작업 진행도 조회 핸들러
+ */
+async function handleGitHubTaskProgress(req, res) {
+    logger.debug('Serving GitHub task progress');
+    
+    try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const taskId = url.searchParams.get('taskId');
+        
+        if (!taskId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업 ID가 필요합니다.' }));
+            return;
+        }
+        
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService || !gitHubService.backgroundTaskManager) {
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        const taskStatus = gitHubService.backgroundTaskManager.getTaskStatus(taskId);
+        
+        if (!taskStatus) {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업을 찾을 수 없습니다.' }));
+            return;
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: taskStatus }));
+    } catch (error) {
+        logger.error('Error getting GitHub task progress:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '작업 진행도 조회 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 작업 취소 핸들러
+ */
+async function handleGitHubCancelTask(req, res) {
+    logger.info('Processing GitHub task cancellation');
+    
+    try {
+        const body = await getRequestBody(req);
+        const { taskId } = JSON.parse(body);
+        
+        if (!taskId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업 ID가 필요합니다.' }));
+            return;
+        }
+        
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService || !gitHubService.backgroundTaskManager) {
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        const cancelled = gitHubService.backgroundTaskManager.cancelTask(taskId);
+        
+        if (cancelled) {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: true, message: '작업이 취소되었습니다.' }));
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '작업을 찾을 수 없거나 취소할 수 없습니다.' }));
+        }
+    } catch (error) {
+        logger.error('Error cancelling GitHub task:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '작업 취소 중 오류가 발생했습니다.' }));
+    }
+}
+
+/**
+ * GitHub 최근 리포트 조회 핸들러
+ */
+async function handleGitHubLatestReport(req, res) {
+    logger.debug('Serving latest GitHub report');
+    
+    try {
+        const gitHubService = scheduleService.getGitHubService();
+        
+        if (!gitHubService || !gitHubService.isEnabled) {
+            res.writeHead(503, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: 'GitHub 서비스를 사용할 수 없습니다.' }));
+            return;
+        }
+        
+        const latestReport = gitHubService.getLatestTodayReport();
+        
+        if (!latestReport) {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({ success: false, message: '오늘 생성된 리포트가 없습니다.' }));
+            return;
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, data: latestReport }));
+    } catch (error) {
+        logger.error('Error getting latest GitHub report:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, message: '최근 리포트 조회 중 오류가 발생했습니다.' }));
     }
 }
 
