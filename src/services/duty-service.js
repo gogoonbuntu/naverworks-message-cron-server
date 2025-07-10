@@ -4,7 +4,7 @@
 const logger = require('../../logger');
 const configService = require('./config-service');
 const messageService = require('./message-service');
-const { getCurrentKSTDate, formatDateToKey, getWeekDates, DAY_NAMES, getWeekKey } = require('../utils/date-utils');
+const { getCurrentKSTDate, formatDateToKey, getWeekDates, DAY_NAMES } = require('../utils/date-utils');
 
 /**
  * 주간 당직 편성표 조회 (7일간의 일일 당직자)
@@ -21,32 +21,10 @@ function getWeeklyDutySchedule() {
             const date = new Date(dateKey);
             let members = [];
             
-            // 새로운 형태의 dailyDutySchedule 확인
+            // dailyDutySchedule에서 해당 날짜의 당직자 찾기
             const dutyData = config.dailyDutySchedule?.[dateKey];
             if (dutyData && dutyData.members) {
                 members = dutyData.members;
-            }
-            // 기존 형태의 weeklyDutySchedule 또는 currentWeekDuty 확인
-            else if (config.weeklyDutySchedule || config.currentWeekDuty) {
-                const weeklyData = config.weeklyDutySchedule || config.currentWeekDuty;
-                const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][index];
-                
-                // 주차별 데이터 확인
-                if (Array.isArray(weeklyData)) {
-                    const dayData = weeklyData.find(d => d.day === dayName);
-                    if (dayData && dayData.members) {
-                        members = dayData.members;
-                    }
-                } else {
-                    // 주차 키로 저장된 데이터 확인
-                    const weekKey = getWeekKey();
-                    if (weeklyData[weekKey] && Array.isArray(weeklyData[weekKey])) {
-                        const dayData = weeklyData[weekKey].find(d => d.day === dayName);
-                        if (dayData && dayData.members) {
-                            members = dayData.members;
-                        }
-                    }
-                }
             }
             
             weeklySchedule.push({
@@ -79,58 +57,11 @@ function getTodayDutyMembers() {
         
         logger.debug(`Looking for today's duty for date: ${dateKey}`);
         
-        // 당일 당직 스케줄에서 먼저 찾기
-        let todayDuty = null;
-        if (config.dailyDutySchedule && config.dailyDutySchedule[dateKey]) {
-            todayDuty = config.dailyDutySchedule[dateKey];
-            logger.debug(`Found today's duty in dailyDutySchedule`);
-        }
-        
-        // 없으면 주간 스케줄에서 찾기
-        if (!todayDuty || !todayDuty.members || todayDuty.members.length === 0) {
-            const weekDates = getWeekDates();
-            const todayIndex = weekDates.findIndex(date => date === dateKey);
-            
-            if (todayIndex !== -1) {
-                const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][todayIndex];
-                
-                // 새로운 형태의 주간 스케줄 확인
-                if (config.weeklyDutySchedule) {
-                    if (Array.isArray(config.weeklyDutySchedule)) {
-                        const dayData = config.weeklyDutySchedule.find(d => d.day === dayName);
-                        if (dayData && dayData.members) {
-                            todayDuty = { members: dayData.members };
-                            logger.debug(`Found today's duty in weeklyDutySchedule array`);
-                        }
-                    } else {
-                        // 주차 키로 저장된 데이터 확인
-                        const weekKey = getWeekKey();
-                        if (config.weeklyDutySchedule[weekKey] && Array.isArray(config.weeklyDutySchedule[weekKey])) {
-                            const dayData = config.weeklyDutySchedule[weekKey].find(d => d.day === dayName);
-                            if (dayData && dayData.members) {
-                                todayDuty = { members: dayData.members };
-                                logger.debug(`Found today's duty in weeklyDutySchedule with weekKey`);
-                            }
-                        }
-                    }
-                }
-                
-                // 기존 형태의 currentWeekDuty 확인
-                if (!todayDuty && config.currentWeekDuty) {
-                    if (Array.isArray(config.currentWeekDuty)) {
-                        const dayData = config.currentWeekDuty.find(d => d.day === dayName);
-                        if (dayData && dayData.members) {
-                            todayDuty = { members: dayData.members };
-                            logger.debug(`Found today's duty in currentWeekDuty`);
-                        }
-                    }
-                }
-            }
-        }
+        // dailyDutySchedule에서 당일 당직자 찾기
+        const todayDuty = config.dailyDutySchedule?.[dateKey];
         
         if (!todayDuty || !todayDuty.members || todayDuty.members.length === 0) {
             logger.debug(`No duty found for today: ${dateKey}`);
-            // 당직자가 없는 경우에도 빈 객체 반환 (null이 아님)
             return {
                 date: dateKey,
                 members: [],

@@ -13,9 +13,9 @@ const CONFIG_FILE = path.join(__dirname, '../../config.json');
 const DEFAULT_CONFIG = {
     schedules: [],
     teamMembers: [],
-    currentLaptopDutyPair: [],
+    codeReviewPairs: [],
     dailyDutySchedule: {},
-    codeReviewPairs: []
+    currentLaptopDutyPair: []
 };
 
 /**
@@ -36,9 +36,9 @@ function loadConfig() {
         // 필수 속성 확인 및 초기화
         if (!config.schedules) config.schedules = [];
         if (!config.teamMembers) config.teamMembers = [];
-        if (!config.currentLaptopDutyPair) config.currentLaptopDutyPair = [];
-        if (!config.dailyDutySchedule) config.dailyDutySchedule = {};
         if (!config.codeReviewPairs) config.codeReviewPairs = [];
+        if (!config.dailyDutySchedule) config.dailyDutySchedule = {};
+        if (!config.currentLaptopDutyPair) config.currentLaptopDutyPair = [];
         
         logger.info(`Configuration loaded successfully. Schedules: ${config.schedules.length}, Team members: ${config.teamMembers.length}`);
         return config;
