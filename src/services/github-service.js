@@ -183,9 +183,11 @@ class GitHubService {
     async getRepositoryPullRequests(owner, repo, since, until) {
         try {
             const endpoint = `/repos/${owner}/${repo}/pulls`;
-            const url = endpoint + '?state=all&per_page=100&sort=updated&direction=desc';
+            const url = endpoint + '?state=all&per_page=100&sort=created&direction=desc';
 
             const pullRequests = await this.makeGitHubApiCall(url);
+            
+            logger.debug(`Raw PRs from ${repo}: ${pullRequests.length}`);
             
             const filteredPRs = pullRequests.filter(pr => {
                 const createdDate = new Date(pr.created_at);
@@ -194,6 +196,8 @@ class GitHubService {
                 
                 return createdDate >= sinceDate && createdDate <= untilDate;
             });
+            
+            logger.debug(`Filtered PRs from ${repo}: ${filteredPRs.length}`);
 
             const detailedPRs = [];
             for (const pr of filteredPRs.slice(0, 50)) {
@@ -211,6 +215,8 @@ class GitHubService {
                         deletions: detailedPR.deletions || 0,
                         changedFiles: detailedPR.changed_files || 0
                     });
+                    
+                    logger.debug(`PR #${pr.number} by ${pr.user.login}: ${pr.title}`);
                     
                     await new Promise(resolve => setTimeout(resolve, 200));
                 } catch (error) {
@@ -345,13 +351,16 @@ class GitHubService {
                 email: member.email,
                 commits: 0,
                 pullRequests: 0,
+                pullRequestsMerged: 0,
+                pullRequestsClosed: 0,
                 linesAdded: 0,
                 linesDeleted: 0,
                 prComments: 0,
                 reviews: 0,
                 issuesCreated: 0,
                 issuesClosed: 0,
-                repositories: new Set()
+                repositories: new Set(),
+                prProcessingTimes: []
             };
         });
 
@@ -374,48 +383,95 @@ class GitHubService {
             try {
                 // 커밋 정보 수집
                 const commits = await this.getRepositoryCommits(repo.owner, repo.name, since, until);
+                logger.info(`Repository ${repo.name}: Found ${commits.length} commits`);
+                
                 commits.forEach(commit => {
                     const member = Object.values(this.config.teamMapping || {}).find(m => 
-                        m.githubUsername === commit.author || m.email === commit.authorEmail
+                        m.githubUsername === commit.author || 
+                        m.githubUsername.toLowerCase() === commit.author.toLowerCase() ||
+                        m.email === commit.authorEmail ||
+                        m.name === commit.authorName
                     );
                     
-                    if (member) {
-                        const memberId = Object.keys(this.config.teamMapping || {}).find(id => 
-                            this.config.teamMapping[id] === member
-                        );
+                    if (!member) {
+                        logger.warn(`❌ ${commit.author} | ${repo.name} | 커밋 ${commit.sha.substring(0,7)} | 매핑 실패`);
+                        return;
+                    }
+                    
+                    const memberId = Object.keys(this.config.teamMapping || {}).find(id => 
+                        this.config.teamMapping[id] === member
+                    );
+                    
+                    if (memberId && teamStats[memberId]) {
+                        teamStats[memberId].commits++;
+                        teamStats[memberId].linesAdded += commit.additions;
+                        teamStats[memberId].linesDeleted += commit.deletions;
+                        teamStats[memberId].repositories.add(repo.name);
                         
-                        if (memberId && teamStats[memberId]) {
-                            teamStats[memberId].commits++;
-                            teamStats[memberId].linesAdded += commit.additions;
-                            teamStats[memberId].linesDeleted += commit.deletions;
-                            teamStats[memberId].repositories.add(repo.name);
+                        logger.info(`💻 ${member.name} | ${repo.name} | 커밋 | +1 (총 ${teamStats[memberId].commits})`);
+                        if (commit.additions > 0 || commit.deletions > 0) {
+                            logger.info(`📝 ${member.name} | ${repo.name} | 커밋변경 | +${commit.additions}/-${commit.deletions}`);
                         }
                     }
                 });
 
                 // PR 정보 수집
                 const pullRequests = await this.getRepositoryPullRequests(repo.owner, repo.name, since, until);
+                logger.info(`Repository ${repo.name}: Found ${pullRequests.length} PRs`);
+                
                 pullRequests.forEach(pr => {
+                    // 다양한 방식으로 팀 멤버 찾기
                     const member = Object.values(this.config.teamMapping || {}).find(m => 
-                        m.githubUsername === pr.author
+                        m.githubUsername === pr.author || 
+                        m.githubUsername.toLowerCase() === pr.author.toLowerCase() ||
+                        m.email === pr.author + '@danal.co.kr' ||
+                        m.name === pr.author
                     );
                     
-                    if (member) {
-                        const memberId = Object.keys(this.config.teamMapping || {}).find(id => 
-                            this.config.teamMapping[id] === member
-                        );
+                    if (!member) {
+                        logger.warn(`❌ ${pr.author} | ${repo.name} | PR #${pr.number} | 매핑 실패`);
+                        return;
+                    }
+                    
+                    const memberId = Object.keys(this.config.teamMapping || {}).find(id => 
+                        this.config.teamMapping[id] === member
+                    );
+                    
+                    if (memberId && teamStats[memberId]) {
+                        // 모든 PR 생성 카운트
+                        teamStats[memberId].pullRequests++;
                         
-                        if (memberId && teamStats[memberId]) {
-                            teamStats[memberId].pullRequests++;
+                        // PR 상태별 분류
+                        if (pr.mergedAt) {
+                            teamStats[memberId].pullRequestsMerged++;
+                            logger.info(`✅ ${member.name} | ${repo.name} | PR완료 | +1 (총 ${teamStats[memberId].pullRequestsMerged})`);
+                            
+                            // PR 처리 시간 계산 (완료된 PR만)
+                            const processingTime = new Date(pr.mergedAt) - new Date(pr.createdAt);
+                            const processingDays = processingTime / (1000 * 60 * 60 * 24);
+                            teamStats[memberId].prProcessingTimes.push(processingDays);
+                        } else if (pr.state === 'closed') {
+                            teamStats[memberId].pullRequestsClosed++;
+                            logger.info(`❌ ${member.name} | ${repo.name} | PR닫힘 | +1 (총 ${teamStats[memberId].pullRequestsClosed})`);
+                        } else {
+                            logger.info(`🔄 ${member.name} | ${repo.name} | PR생성 | +1 (총 ${teamStats[memberId].pullRequests})`);
+                        }
+                        
+                        // 코드 변경량 추가
+                        if (pr.additions > 0 || pr.deletions > 0) {
                             teamStats[memberId].linesAdded += pr.additions;
                             teamStats[memberId].linesDeleted += pr.deletions;
-                            teamStats[memberId].repositories.add(repo.name);
+                            logger.info(`📝 ${member.name} | ${repo.name} | 코드변경 | +${pr.additions}/-${pr.deletions}`);
                         }
+                        
+                        teamStats[memberId].repositories.add(repo.name);
                     }
                 });
 
                 // PR 댓글 수집
                 const prComments = await this.getRepositoryPRComments(repo.owner, repo.name, since, until);
+                logger.info(`Repository ${repo.name}: Found ${prComments.length} PR comments`);
+                
                 prComments.forEach(comment => {
                     const member = Object.values(this.config.teamMapping || {}).find(m => 
                         m.githubUsername === comment.author
@@ -429,12 +485,15 @@ class GitHubService {
                         if (memberId && teamStats[memberId]) {
                             teamStats[memberId].prComments++;
                             teamStats[memberId].repositories.add(repo.name);
+                            logger.info(`💬 ${member.name} | ${repo.name} | PR댓글 | +1 (총 ${teamStats[memberId].prComments})`);
                         }
                     }
                 });
 
                 // 리뷰 수집
                 const reviews = await this.getRepositoryReviews(repo.owner, repo.name, since, until);
+                logger.info(`Repository ${repo.name}: Found ${reviews.length} reviews`);
+                
                 reviews.forEach(review => {
                     const member = Object.values(this.config.teamMapping || {}).find(m => 
                         m.githubUsername === review.author
@@ -448,6 +507,7 @@ class GitHubService {
                         if (memberId && teamStats[memberId]) {
                             teamStats[memberId].reviews++;
                             teamStats[memberId].repositories.add(repo.name);
+                            logger.info(`🔍 ${member.name} | ${repo.name} | 리뷰 | +1 (총 ${teamStats[memberId].reviews})`);
                         }
                     }
                 });
@@ -486,6 +546,14 @@ class GitHubService {
 
         Object.keys(teamStats).forEach(memberId => {
             teamStats[memberId].repositories = Array.from(teamStats[memberId].repositories);
+            
+            // 평균 PR 처리 시간 계산
+            if (teamStats[memberId].prProcessingTimes.length > 0) {
+                const totalTime = teamStats[memberId].prProcessingTimes.reduce((sum, time) => sum + time, 0);
+                teamStats[memberId].avgPrProcessingTime = totalTime / teamStats[memberId].prProcessingTimes.length;
+            } else {
+                teamStats[memberId].avgPrProcessingTime = 0;
+            }
         });
 
         updateProgress(95, '리포트 메시지를 생성하고 있습니다...', 'message_generation');
@@ -510,6 +578,8 @@ class GitHubService {
         const weights = {
             commits: 10,
             pullRequests: 15,
+            pullRequestsMerged: 20,     // 완료된 PR에 더 높은 가중치
+            pullRequestsClosed: 5,      // 닫힌 PR에 낙점
             linesAdded: 0.01,
             linesDeleted: 0.005,
             prComments: 5,
@@ -521,6 +591,8 @@ class GitHubService {
         let score = 0;
         score += stats.commits * weights.commits;
         score += stats.pullRequests * weights.pullRequests;
+        score += stats.pullRequestsMerged * weights.pullRequestsMerged;
+        score -= stats.pullRequestsClosed * weights.pullRequestsClosed;  // 닫힌 PR은 마이너스
         score += stats.linesAdded * weights.linesAdded;
         score += stats.linesDeleted * weights.linesDeleted;
         score += stats.prComments * weights.prComments;
@@ -563,6 +635,8 @@ class GitHubService {
         const maxValues = {
             commits: Math.max(...activeMembers.map(m => m.commits)),
             pullRequests: Math.max(...activeMembers.map(m => m.pullRequests)),
+            pullRequestsMerged: Math.max(...activeMembers.map(m => m.pullRequestsMerged)),
+            pullRequestsClosed: Math.max(...activeMembers.map(m => m.pullRequestsClosed)),
             linesAdded: Math.max(...activeMembers.map(m => m.linesAdded)),
             prComments: Math.max(...activeMembers.map(m => m.prComments)),
             reviews: Math.max(...activeMembers.map(m => m.reviews)),
@@ -581,8 +655,8 @@ class GitHubService {
         });
         message += `\n`;
 
-        // PR 순위
-        message += `🔄 Pull Request 순위\n`;
+        // PR 생성 순위
+        message += `🔄 Pull Request 생성 순위\n`;
         const prRanking = [...activeMembers].sort((a, b) => b.pullRequests - a.pullRequests);
         prRanking.forEach((member, index) => {
             if (member.pullRequests > 0) {
@@ -591,6 +665,21 @@ class GitHubService {
             }
         });
         message += `\n`;
+
+        // PR 완료 순위 (새로 추가)
+        if (maxValues.pullRequestsMerged > 0) {
+            message += `✅ Pull Request 완료 순위\n`;
+            const prMergedRanking = [...activeMembers].sort((a, b) => b.pullRequestsMerged - a.pullRequestsMerged);
+            prMergedRanking.forEach((member, index) => {
+                if (member.pullRequestsMerged > 0) {
+                    const bar = this.generateBarChart(member.pullRequestsMerged, maxValues.pullRequestsMerged, 8);
+                    const successRate = member.pullRequests > 0 ? 
+                        Math.round((member.pullRequestsMerged / member.pullRequests) * 100) : 0;
+                    message += `${index + 1}. ${bar} ${member.pullRequestsMerged}건 (성공률 ${successRate}%) - ${member.name}\n`;
+                }
+            });
+            message += `\n`;
+        }
 
         // 코드 라인 순위
         message += `📝 코드 변경량 순위\n`;
@@ -617,6 +706,18 @@ class GitHubService {
             message += `\n`;
         }
 
+        // PR 효율성 순위 (새로 추가)
+        const membersWithAvgTime = activeMembers.filter(member => member.avgPrProcessingTime > 0);
+        if (membersWithAvgTime.length > 0) {
+            message += `⚡ PR 효율성 순위 (평균 처리 시간)\n`;
+            const prEfficiencyRanking = [...membersWithAvgTime].sort((a, b) => a.avgPrProcessingTime - b.avgPrProcessingTime);
+            prEfficiencyRanking.forEach((member, index) => {
+                const days = Math.round(member.avgPrProcessingTime * 10) / 10;
+                message += `${index + 1}. ⚡ ${days}일 - ${member.name}\n`;
+            });
+            message += `\n`;
+        }
+
         // 이슈 처리 순위
         if (maxValues.issuesCreated > 0 || maxValues.issuesClosed > 0) {
             message += `🐛 이슈 처리 순위\n`;
@@ -634,15 +735,23 @@ class GitHubService {
         // 전체 통계
         const totalCommits = activeMembers.reduce((sum, member) => sum + member.commits, 0);
         const totalPRs = activeMembers.reduce((sum, member) => sum + member.pullRequests, 0);
+        const totalPRsMerged = activeMembers.reduce((sum, member) => sum + member.pullRequestsMerged, 0);
+        const totalPRsClosed = activeMembers.reduce((sum, member) => sum + member.pullRequestsClosed, 0);
         const totalAdded = activeMembers.reduce((sum, member) => sum + member.linesAdded, 0);
         const totalDeleted = activeMembers.reduce((sum, member) => sum + member.linesDeleted, 0);
         const totalReviews = activeMembers.reduce((sum, member) => sum + member.reviews, 0);
         const totalComments = activeMembers.reduce((sum, member) => sum + member.prComments, 0);
         const totalIssues = activeMembers.reduce((sum, member) => sum + member.issuesCreated + member.issuesClosed, 0);
         
+        const overallSuccessRate = totalPRs > 0 ? Math.round((totalPRsMerged / totalPRs) * 100) : 0;
+        
         message += `📈 전체 팀 활동 요약\n`;
         message += `🔥 총 커밋: ${totalCommits}회\n`;
         message += `🔄 총 PR: ${totalPRs}건\n`;
+        message += `✅ 완료된 PR: ${totalPRsMerged}건 (성공률 ${overallSuccessRate}%)\n`;
+        if (totalPRsClosed > 0) {
+            message += `❌ 닫힌 PR: ${totalPRsClosed}건\n`;
+        }
         message += `📝 총 코드 변경: +${totalAdded}/-${totalDeleted}\n`;
         message += `💬 총 리뷰: ${totalReviews}건\n`;
         message += `📨 총 댓글: ${totalComments}개\n`;
