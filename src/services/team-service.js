@@ -83,106 +83,57 @@ async function assignCodeReviewPairsAndSendMessage() {
 }
 
 /**
- * 노트북 지참 알림 배정 및 전송 (기존 기능 유지 - 개별 발송)
+ * 노트북 지참 알림 전송 (당일 당직자에게 노트북 지참 알림)
+ * 기존 복잡한 로직을 단순화: 오늘의 당직자 = 노트북 지참자
  */
 async function assignLaptopDutyAndSendMessage() {
     try {
         const config = configService.loadConfig();
-        let teamMembers = config.teamMembers;
-
-        const todayKST = getCurrentKSTDate().getDay();
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dutyService = require('./duty-service');
         
-        logger.info(`Starting laptop duty assignment for ${dayNames[todayKST]} (day ${todayKST})`);
-        logger.debug(`Current team members: ${teamMembers.map(m => `${m.name}(${m.id})`).join(', ')}`);
+        logger.info('Starting laptop duty notification (using today\'s duty members)');
         
-        let selectedPair = [];
-        let message = "⚠️ 노트북 지참 알림 ⚠️\n\n오늘 노트북 지참 당번은 다음과 같습니다:\n";
-
-        if (todayKST === 5) { // 금요일
-            logger.info('Processing Friday laptop duty assignment (weekend included)');
-            const result = assignLaptopDutyPair(teamMembers, 'friday');
-            selectedPair = result.selectedPair;
-            message += result.message;
+        // 오늘의 당직자 조회
+        const todayDuty = dutyService.getTodayDutyMembers();
+        
+        if (!todayDuty || todayDuty.hasNoDuty || todayDuty.members.length === 0) {
+            logger.warn('No duty assignment found for today - laptop duty notification skipped');
             
-            configService.updateCurrentLaptopDutyPair(selectedPair);
-            configService.updateTeamMembers(teamMembers);
-
-        } else if (todayKST === 6 || todayKST === 0) { // 토/일요일
-            logger.info('Processing weekend laptop duty (using Friday assignment)');
-            if (config.currentLaptopDutyPair && config.currentLaptopDutyPair.length === 2) {
-                selectedPair = config.currentLaptopDutyPair;
-                const member1 = teamMembers.find(m => m.id === selectedPair[0]);
-                const member2 = teamMembers.find(m => m.id === selectedPair[1]);
-                message += `- ${member1 ? member1.name : selectedPair[0]} (${selectedPair[0]})\n`;
-                message += `- ${member2 ? member2.name : selectedPair[1]} (${selectedPair[1]})\n`;
-                logger.info(`Weekend assignment: ${selectedPair[0]} + ${selectedPair[1]} (from Friday)`);
-            } else {
-                message = "⚠️ 노트북 지참 알림 ⚠️\n\n금요일 당번 정보가 없어 당번을 배정할 수 없습니다.";
-                selectedPair = [];
-                logger.warn('No Friday assignment data available for weekend');
-            }
-        } else { // 월~목요일
-            logger.info('Processing weekday laptop duty assignment');
-            const result = assignLaptopDutyPair(teamMembers, 'weekday');
-            selectedPair = result.selectedPair;
-            message += result.message;
+            // 당직자가 없으면 알림만 보내고 종료
+            const message = "⚠️ 노트북 지참 알림 ⚠️\n\n" +
+                          "오늘 당직자가 배정되지 않았습니다.\n" +
+                          "주간 당직 편성을 확인해주세요.";
             
-            configService.updateCurrentLaptopDutyPair([]);
-            configService.updateTeamMembers(teamMembers);
-        }
-
-        if (selectedPair.length > 0 || message.includes("부족")) {
-            const recipients = teamMembers.map(m => m.id).join(',');
-            logger.info(`Sending laptop duty notification to all team members: ${recipients}`);
+            const recipients = config.teamMembers.map(m => m.id).join(',');
             await messageService.sendMessagesToMultipleRecipients(message, recipients);
-            logger.info('Laptop duty notification sent successfully');
+            return;
         }
+        
+        // 당직자들에게 노트북 지참 알림 발송
+        const memberNames = todayDuty.members.map(m => `${m.name}(${m.id})`).join(' & ');
+        
+        let message = "⚠️ 노트북 지참 알림 ⚠️\n\n";
+        message += `오늘(${todayDuty.displayDate}) 당직자 노트북 지참 안내:\n\n`;
+        todayDuty.members.forEach(member => {
+            message += `- ${member.name} (${member.id})\n`;
+        });
+        message += "\n📱 당직 업무 안내:\n";
+        message += "- 노트북 지참 필수\n";
+        message += "- 긴급상황 대응 준비\n";
+        message += "- 당직 업무 수행\n\n";
+        message += "수고하세요! 💪";
+        
+        // 모든 팀원에게 개별 발송
+        const recipients = config.teamMembers.map(m => m.id).join(',');
+        logger.info(`Sending laptop duty notification to all team members: ${recipients}`);
+        logger.info(`Today's duty members for laptop notification: ${memberNames}`);
+        
+        await messageService.sendMessagesToMultipleRecipients(message, recipients);
+        logger.info('Laptop duty notification sent successfully');
+        
     } catch (error) {
-        logger.error(`Error in laptop duty assignment: ${error.message}`, error);
+        logger.error(`Error in laptop duty notification: ${error.message}`, error);
     }
-}
-
-/**
- * 노트북 당직 짝 배정 로직
- * @param {Array} teamMembers - 팀원 배열
- * @param {string} type - 배정 타입 ('friday', 'weekday')
- * @returns {Object} - 배정 결과 객체
- */
-function assignLaptopDutyPair(teamMembers, type) {
-    const authorizedMembers = teamMembers.filter(member => member.isAuthorized);
-    authorizedMembers.sort((a, b) => (a.laptopDutyCount || 0) - (b.laptopDutyCount || 0));
-    const selectedAuthorized = authorizedMembers.length > 0 ? authorizedMembers[0] : null;
-
-    const otherMembers = teamMembers.filter(member => !member.isAuthorized || member.id !== (selectedAuthorized ? selectedAuthorized.id : null));
-    otherMembers.sort((a, b) => (a.laptopDutyCount || 0) - (b.laptopDutyCount || 0));
-    const selectedOther = otherMembers.length > 0 ? otherMembers[0] : null;
-
-    let selectedPair = [];
-    let message = "";
-
-    if (selectedAuthorized && selectedOther) {
-        selectedPair = [selectedAuthorized.id, selectedOther.id];
-        teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount = (teamMembers.find(m => m.id === selectedAuthorized.id).laptopDutyCount || 0) + 1;
-        teamMembers.find(m => m.id === selectedOther.id).laptopDutyCount = (teamMembers.find(m => m.id === selectedOther.id).laptopDutyCount || 0) + 1;
-        message += `- ${teamMembers.find(m => m.id === selectedAuthorized.id).name} (${selectedAuthorized.id})\n`;
-        message += `- ${teamMembers.find(m => m.id === selectedOther.id).name} (${selectedOther.id})\n`;
-        logger.info(`${type} assignment: ${selectedAuthorized.id} (authorized) + ${selectedOther.id}`);
-    } else if (teamMembers.length >= 2) {
-        teamMembers.sort((a, b) => (a.laptopDutyCount || 0) - (b.laptopDutyCount || 0));
-        selectedPair = [teamMembers[0].id, teamMembers[1].id];
-        teamMembers.find(m => m.id === teamMembers[0].id).laptopDutyCount = (teamMembers.find(m => m.id === teamMembers[0].id).laptopDutyCount || 0) + 1;
-        teamMembers.find(m => m.id === teamMembers[1].id).laptopDutyCount = (teamMembers.find(m => m.id === teamMembers[1].id).laptopDutyCount || 0) + 1;
-        message += `- ${teamMembers.find(m => m.id === teamMembers[0].id).name} (${teamMembers[0].id})\n`;
-        message += `- ${teamMembers.find(m => m.id === teamMembers[1].id).name} (${teamMembers[1].id})\n`;
-        logger.info(`${type} assignment (fallback): ${teamMembers[0].id} + ${teamMembers[1].id}`);
-    } else {
-        message = "⚠️ 노트북 지참 알림 ⚠️\n\n팀원이 부족하여 노트북 당번을 배정할 수 없습니다.";
-        selectedPair = [];
-        logger.warn(`Insufficient team members for ${type} laptop duty assignment`);
-    }
-
-    return { selectedPair, message };
 }
 
 /**
@@ -199,8 +150,7 @@ function getTeamMemberStats() {
             dutyStats: config.teamMembers.map(m => ({
                 id: m.id,
                 name: m.name,
-                dailyDutyCount: m.dailyDutyCount || 0,
-                laptopDutyCount: m.laptopDutyCount || 0,
+                dutyCount: m.dutyCount || 0,
                 codeReviewCount: m.codeReviewCount || 0
             }))
         };
@@ -219,8 +169,7 @@ function resetTeamMemberCounts() {
     try {
         const config = configService.loadConfig();
         config.teamMembers.forEach(member => {
-            member.dailyDutyCount = 0;
-            member.laptopDutyCount = 0;
+            member.dutyCount = 0;
             member.codeReviewCount = 0;
         });
         
@@ -237,7 +186,6 @@ function resetTeamMemberCounts() {
 module.exports = {
     assignCodeReviewPairsAndSendMessage,
     assignLaptopDutyAndSendMessage,
-    assignLaptopDutyPair,
     getTeamMemberStats,
     resetTeamMemberCounts
 };

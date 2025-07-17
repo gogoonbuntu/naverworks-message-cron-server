@@ -96,10 +96,10 @@ function setupDefaultSchedules() {
     // 노트북 지참 알림 (매일 오전 9시) - 개별 발송
     const laptopDutyJob = cron.schedule('0 9 * * *', async () => {
         try {
-            logger.info('Executing laptop duty assignment (9 AM) - Individual');
+            logger.info('Executing laptop duty notification (9 AM) - Individual');
             await teamService.assignLaptopDutyAndSendMessage();
         } catch (error) {
-            logger.error(`Error in laptop duty assignment job: ${error.message}`, error);
+            logger.error(`Error in laptop duty notification job: ${error.message}`, error);
         }
     }, {
         scheduled: true,
@@ -157,7 +157,7 @@ function setupDefaultSchedules() {
     logger.logScheduledTask('weekly_duty', '0 8 * * 1', 'Weekly duty assignment every Monday 8 AM - Channel');
     logger.logScheduledTask('duty_reminder', '0 14,16 * * *', 'Duty reminders every day at 2 PM and 4 PM - Channel');
     logger.logScheduledTask('code_review_pairs', '0 9 * * 1', 'Code review pair assignment every Monday 9 AM - Channel');
-    logger.logScheduledTask('laptop_duty', '0 9 * * *', 'Laptop duty assignment every day 9 AM - Individual');
+    logger.logScheduledTask('laptop_duty', '0 9 * * *', 'Laptop duty notification every day 9 AM - Individual (for today\'s duty members)');
     
     // GitHub 기능 상태 로깅
     if (gitHubService.isEnabled) {
@@ -209,10 +209,10 @@ function rescheduleJobs(config) {
             case 'laptop_duty':
                 taskFunction = async () => {
                     try {
-                        logger.info(`Executing scheduled laptop duty task: ${jobId}`);
+                        logger.info(`Executing scheduled laptop duty notification task: ${jobId}`);
                         await teamService.assignLaptopDutyAndSendMessage();
                     } catch (error) {
-                        logger.error(`Error in scheduled laptop duty task ${jobId}: ${error.message}`, error);
+                        logger.error(`Error in scheduled laptop duty notification task ${jobId}: ${error.message}`, error);
                     }
                 };
                 break;
@@ -267,7 +267,7 @@ async function executeScheduleById(scheduleId, config) {
             await messageService.sendMessagesToMultipleRecipients(schedule.message, schedule.recipients);
             break;
         case 'laptop_duty':
-            logger.info('Executing laptop duty schedule');
+            logger.info('Executing laptop duty notification schedule');
             await teamService.assignLaptopDutyAndSendMessage();
             break;
         case 'code_review':

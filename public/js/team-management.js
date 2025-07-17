@@ -22,8 +22,7 @@ function renderTeamMemberList() {
             <p><strong>ID:</strong> ${member.id}</p>
             <p><strong>이름:</strong> ${member.name}</p>
             <p><strong>권한:</strong> ${member.isAuthorized ? '예' : '아니오'}</p>
-            <p><strong>노트북 지참 횟수:</strong> ${member.laptopDutyCount || 0}회</p>
-            <p><strong>주간 당직 횟수:</strong> ${member.weeklyDutyCount || 0}회</p>
+            <p><strong>당직 횟수:</strong> ${member.dutyCount || 0}회</p>
             <p><strong>코드리뷰 횟수:</strong> ${member.codeReviewCount || 0}회</p>
             <div class="actions">
                 <button class="edit-btn" data-id="${member.id}">편집</button>
@@ -90,8 +89,7 @@ addTeamMemberButton.addEventListener('click', async () => {
             id,
             name,
             isAuthorized,
-            laptopDutyCount: 0,
-            weeklyDutyCount: 0,
+            dutyCount: 0,
             codeReviewCount: 0
         };
         updatedTeamMembers = [...currentConfig.teamMembers, newMember];

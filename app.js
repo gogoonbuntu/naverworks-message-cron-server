@@ -20,10 +20,10 @@ function startApplication() {
         // 성공 메시지 출력
         logger.info("Initial configuration loaded and scheduling completed.");
         logger.info("🔥 Default schedules active:");
-        logger.info("- Weekly duty assignment: Monday 8 AM → Channel");
+        logger.info("- Weekly duty assignment: Monday 8 AM → Channel (7 days schedule)");
         logger.info("- Duty reminders: Every day 2 PM & 4 PM → Channel");
         logger.info("- Code review pairs: Monday 9 AM → Channel");
-        logger.info("- Laptop duty notifications: Every day 9 AM → Individual");
+        logger.info("- Laptop duty notifications: Every day 9 AM → Individual (today's duty members)");
         logger.info("Press Ctrl+C to stop the server.");
     });
     
@@ -91,10 +91,10 @@ function displayApplicationInfo() {
     logger.info('📋 Naverworks Message Cron Server');
     logger.info('🎯 Purpose: Team notification automation');
     logger.info('⚙️ Features:');
-    logger.info('   - Weekly duty assignment');
+    logger.info('   - Weekly duty assignment (7-day schedule)');
     logger.info('   - Daily duty reminders');
     logger.info('   - Code review pair assignment');
-    logger.info('   - Laptop duty notifications');
+    logger.info('   - Laptop duty notifications (for today\'s duty members)');
     logger.info('   - GitHub activity reports (optional)');
     logger.info('');
 }

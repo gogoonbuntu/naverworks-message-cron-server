@@ -14,8 +14,7 @@ const DEFAULT_CONFIG = {
     schedules: [],
     teamMembers: [],
     codeReviewPairs: [],
-    dailyDutySchedule: {},
-    currentLaptopDutyPair: []
+    dailyDutySchedule: {}
 };
 
 /**
@@ -38,6 +37,8 @@ function loadConfig() {
         if (!config.teamMembers) config.teamMembers = [];
         if (!config.codeReviewPairs) config.codeReviewPairs = [];
         if (!config.dailyDutySchedule) config.dailyDutySchedule = {};
+        
+        // 레거시 속성 정리 (기존 코드와의 호환성을 위해 유지)
         if (!config.currentLaptopDutyPair) config.currentLaptopDutyPair = [];
         
         logger.info(`Configuration loaded successfully. Schedules: ${config.schedules.length}, Team members: ${config.teamMembers.length}`);
@@ -108,14 +109,6 @@ function updateDailyDutySchedule(dateKey, members) {
 }
 
 /**
- * 현재 노트북 당직 짝 업데이트
- * @param {Array} pair - 노트북 당직 짝 배열
- */
-function updateCurrentLaptopDutyPair(pair) {
-    updateConfigSection('currentLaptopDutyPair', pair);
-}
-
-/**
  * 코드 리뷰 짝 업데이트
  * @param {Array} pairs - 코드 리뷰 짝 배열
  */
@@ -138,7 +131,6 @@ module.exports = {
     updateTeamMembers,
     updateSchedules,
     updateDailyDutySchedule,
-    updateCurrentLaptopDutyPair,
     updateCodeReviewPairs,
     getConfigFilePath,
     DEFAULT_CONFIG

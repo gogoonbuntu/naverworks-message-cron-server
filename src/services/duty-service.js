@@ -117,7 +117,7 @@ async function assignDailyDuty(date, dutyMembers) {
         dutyMembers.forEach(memberId => {
             const member = config.teamMembers.find(m => m.id === memberId);
             if (member) {
-                member.dailyDutyCount = (member.dailyDutyCount || 0) + 1;
+                member.dutyCount = (member.dutyCount || 0) + 1;
             }
         });
         
@@ -145,7 +145,7 @@ async function assignWeeklyDutySchedule() {
         
         // 팀원들을 당직 횟수 기준으로 정렬
         const availableMembers = [...config.teamMembers];
-        availableMembers.sort((a, b) => (a.dailyDutyCount || 0) - (b.dailyDutyCount || 0));
+        availableMembers.sort((a, b) => (a.dutyCount || 0) - (b.dutyCount || 0));
         
         if (availableMembers.length < 2) {
             logger.warn('Not enough team members for duty assignment');
