@@ -308,6 +308,44 @@
         </div>
     </div>
 
+    <!-- 주간당직 미리보기 모달 -->
+    <div id="weeklyDutyPreviewModal" class="modal-overlay" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>주간 당직 편성 미리보기</h3>
+                <button id="closePreviewModal" class="modal-close-btn">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="previewContent" class="preview-content">
+                    <div class="preview-loading">
+                        <p>미리보기를 생성하고 있습니다...</p>
+                    </div>
+                </div>
+                
+                <div id="previewScheduleGrid" class="preview-schedule-grid" style="display: none;">
+                    <!-- 동적으로 생성될 스케줄 그리드 -->
+                </div>
+                
+                <div id="previewMessage" class="preview-message" style="display: none;">
+                    <!-- 미리보기 메시지 내용 -->
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="generateNewCombination" class="secondary-btn" style="display: none;">
+                    🔄 새로운 조합 만들기
+                </button>
+                <button id="confirmWeeklyDuty" class="execute-btn" style="display: none;">
+                    ✅ 확정
+                </button>
+                <button id="cancelWeeklyDuty" class="cancel-btn">
+                    ❌ 취소
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript 파일들 -->
     <script src="public/js/utils.js"></script>
     <script src="public/js/team-management.js"></script>

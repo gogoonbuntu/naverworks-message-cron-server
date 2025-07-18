@@ -47,6 +47,12 @@ async function handleWebRoutes(req, res) {
         else if (req.url === '/execute-weekly-duty' && req.method === 'POST') {
             await handleExecuteWeeklyDuty(req, res);
         }
+        else if (req.url === '/preview-weekly-duty' && req.method === 'POST') {
+            await handlePreviewWeeklyDuty(req, res);
+        }
+        else if (req.url === '/confirm-weekly-duty' && req.method === 'POST') {
+            await handleConfirmWeeklyDuty(req, res);
+        }
         else if (req.url === '/execute-code-review' && req.method === 'POST') {
             await handleExecuteCodeReview(req, res);
         }
@@ -237,6 +243,39 @@ async function handleExecuteSchedule(req, res) {
 async function handleExecuteWeeklyDuty(req, res) {
     logger.info('Processing manual weekly duty assignment');
     const result = await dutyService.assignWeeklyDutySchedule();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+    res.end(JSON.stringify({ 
+        status: result.success ? 'success' : 'error', 
+        message: result.message 
+    }));
+}
+
+/**
+ * 주간 당직 미리보기 핸들러
+ */
+async function handlePreviewWeeklyDuty(req, res) {
+    logger.info('Processing weekly duty preview request');
+    const previewResult = await dutyService.previewWeeklyDutySchedule();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+    res.end(JSON.stringify({ 
+        status: previewResult.success ? 'success' : 'error', 
+        message: previewResult.message,
+        data: previewResult.data,
+        preview: previewResult.preview
+    }));
+}
+
+/**
+ * 주간 당직 확정 핸들러
+ */
+async function handleConfirmWeeklyDuty(req, res) {
+    logger.info('Processing weekly duty confirmation');
+    const body = await getRequestBody(req);
+    const { previewData } = JSON.parse(body);
+    
+    const result = await dutyService.confirmWeeklyDutySchedule(previewData);
     
     res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
     res.end(JSON.stringify({ 
