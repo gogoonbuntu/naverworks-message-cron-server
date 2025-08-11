@@ -114,7 +114,7 @@ function setupDefaultSchedules() {
                 logger.info('Executing GitHub weekly report (Monday 10 AM) - Channel');
                 const result = await gitHubService.generateWeeklyReport();
                 if (result.success) {
-                    await messageService.sendChannelMessage(result.message);
+                    await messageService.sendSingleMessage("tmddud333@naver.com", result.message);
                     logger.info('GitHub weekly report sent successfully to channel');
                 } else {
                     logger.warn(`GitHub weekly report failed: ${result.message}`);
